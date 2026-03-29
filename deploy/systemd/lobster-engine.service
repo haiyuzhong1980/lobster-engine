@@ -1,0 +1,51 @@
+[Unit]
+Description=Lobster Engine — AI Bot Runtime (Gateway)
+Documentation=https://github.com/user/lobster-engine
+After=network-online.target nats.service
+Wants=network-online.target
+Requires=nats.service
+
+[Service]
+Type=simple
+User=lobster
+Group=lobster
+WorkingDirectory=/opt/lobster-engine
+
+# Environment — override via /etc/lobster-engine/gateway.env
+EnvironmentFile=-/etc/lobster-engine/gateway.env
+Environment=NODE_ENV=production
+Environment=PORT=3000
+Environment=LOG_LEVEL=info
+
+ExecStart=/usr/local/bin/node /opt/lobster-engine/dist/index.js
+ExecReload=/bin/kill -HUP $MAINPID
+
+# Restart policy
+Restart=on-failure
+RestartSec=5s
+StartLimitBurst=5
+StartLimitIntervalSec=60s
+
+# Resource limits
+LimitNOFILE=65536
+LimitNPROC=4096
+
+# Security hardening
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+RestrictSUIDSGID=yes
+LockPersonality=yes
+
+# Logging
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=lobster-engine
+
+[Install]
+WantedBy=multi-user.target

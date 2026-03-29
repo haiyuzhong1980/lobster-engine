@@ -1,0 +1,54 @@
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+  external_labels:
+    cluster: lobster-engine
+    env: docker
+
+# Alert rules
+rule_files:
+  - /etc/prometheus/alerts.yml
+
+# Alertmanager (optional, configure if needed)
+# alerting:
+#   alertmanagers:
+#     - static_configs:
+#         - targets: ["alertmanager:9093"]
+
+scrape_configs:
+  # Gateway — Prometheus exposition format at /metrics
+  # The gateway exposes lobster_engine_* metrics via createMetricsHandler()
+  - job_name: gateway
+    static_configs:
+      - targets: ["gateway:3000"]
+    metrics_path: /metrics
+    scrape_interval: 15s
+    scrape_timeout: 10s
+
+  # NATS server — built-in Prometheus endpoint on monitoring port
+  - job_name: nats
+    static_configs:
+      - targets: ["nats:8222"]
+    metrics_path: /metrics
+    scrape_interval: 15s
+    scrape_timeout: 10s
+
+  # Redis — via redis_exporter sidecar (optional; enable if deployed)
+  # - job_name: redis
+  #   static_configs:
+  #     - targets: ["redis-exporter:9121"]
+  #   scrape_interval: 15s
+
+  # Workers — each worker exposes metrics on its own port when configured
+  # In a scaled deployment workers register themselves via service discovery;
+  # for a static local setup list replicas here or use DNS SD.
+  # - job_name: worker
+  #   static_configs:
+  #     - targets: ["worker:9100"]
+  #   metrics_path: /metrics
+  #   scrape_interval: 15s
+
+  # Prometheus self-monitoring
+  - job_name: prometheus
+    static_configs:
+      - targets: ["localhost:9090"]

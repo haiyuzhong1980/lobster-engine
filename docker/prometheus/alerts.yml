@@ -1,0 +1,168 @@
+groups:
+  # ---------------------------------------------------------------------------
+  # Worker health
+  # ---------------------------------------------------------------------------
+  - name: worker
+    rules:
+      - alert: WorkerHeartbeatLost
+        # Fires when a worker has not published a heartbeat for more than 30 s.
+        # Workers publish to worker.<id>.heartbeat per nats-subjects.ts; the
+        # gateway tracks active workers via lobster_engine_worker_active gauge.
+        expr: |
+          (
+            time() - lobster_engine_worker_last_heartbeat_seconds
+          ) > 30
+        for: 0m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Worker heartbeat lost (worker {{ $labels.worker_id }})"
+          description: >
+            Worker {{ $labels.worker_id }} has not published a heartbeat for
+            {{ $value | humanizeDuration }}. The worker may have crashed or
+            lost its NATS connection.
+          runbook: "https://github.com/openclaw/lobster-engine/wiki/runbooks/worker-heartbeat-lost"
+
+  # ---------------------------------------------------------------------------
+  # Error rates
+  # ---------------------------------------------------------------------------
+  - name: error_rates
+    rules:
+      - alert: HighErrorRate
+        # Fires when the error rate across all turn processing exceeds 5 % over
+        # a 5-minute window.  Uses lobster_engine_errors_total counter.
+        expr: |
+          (
+            rate(lobster_engine_errors_total[5m])
+            /
+            (rate(lobster_engine_turns_total[5m]) + 1e-9)
+          ) > 0.05
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High error rate ({{ $value | humanizePercentage }})"
+          description: >
+            The error rate has exceeded 5 % for the past 5 minutes.
+            Current rate: {{ $value | humanizePercentage }}.
+            Affected type: {{ $labels.type }}.
+          runbook: "https://github.com/openclaw/lobster-engine/wiki/runbooks/high-error-rate"
+
+  # ---------------------------------------------------------------------------
+  # AI adapter latency
+  # ---------------------------------------------------------------------------
+  - name: ai_adapter
+    rules:
+      - alert: AILatencyHigh
+        # Fires when the p95 AI adapter call duration exceeds 10 s for 5 min.
+        # Uses lobster_engine_ai_duration_seconds histogram.
+        expr: |
+          histogram_quantile(
+            0.95,
+            rate(lobster_engine_ai_duration_seconds_bucket[5m])
+          ) > 10
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "AI adapter p95 latency high ({{ $value | humanizeDuration }})"
+          description: >
+            The 95th-percentile AI adapter call duration is
+            {{ $value | humanizeDuration }}, above the 10 s threshold.
+            Adapter: {{ $labels.adapter }}.
+          runbook: "https://github.com/openclaw/lobster-engine/wiki/runbooks/ai-latency-high"
+
+      - alert: CircuitBreakerOpen
+        # Fires when any AI adapter circuit breaker is in the open state.
+        # Tracked via lobster_engine_circuit_breaker_open gauge
+        # (1 = open, 0 = closed).
+        expr: lobster_engine_circuit_breaker_open == 1
+        for: 0m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Circuit breaker open (adapter {{ $labels.adapter }})"
+          description: >
+            The circuit breaker for AI adapter {{ $labels.adapter }} is open.
+            Requests to this adapter are being rejected to protect the system.
+          runbook: "https://github.com/openclaw/lobster-engine/wiki/runbooks/circuit-breaker-open"
+
+  # ---------------------------------------------------------------------------
+  # Queue depth
+  # ---------------------------------------------------------------------------
+  - name: queue
+    rules:
+      - alert: QueueDepthHigh
+        # Fires when the NATS worker queue depth exceeds 100 messages for 2 min.
+        # Sourced from NATS monitoring API via lobster_engine_queue_depth gauge.
+        expr: lobster_engine_queue_depth > 100
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Worker queue depth high ({{ $value }} messages)"
+          description: >
+            The NATS worker task queue has {{ $value }} pending messages, above
+            the threshold of 100. Workers may be overloaded or stalled.
+          runbook: "https://github.com/openclaw/lobster-engine/wiki/runbooks/queue-depth-high"
+
+  # ---------------------------------------------------------------------------
+  # Memory
+  # ---------------------------------------------------------------------------
+  - name: resources
+    rules:
+      - alert: MemoryHigh
+        # Fires when any container's memory usage exceeds 80 % for 10 min.
+        # Uses standard container_memory_usage_bytes / container_spec_memory_limit_bytes
+        # metrics from cAdvisor, falling back to process-level Node.js metrics.
+        expr: |
+          (
+            container_memory_usage_bytes{name=~"lobster.*"}
+            /
+            container_spec_memory_limit_bytes{name=~"lobster.*"}
+          ) > 0.80
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Memory usage high ({{ $value | humanizePercentage }}) — {{ $labels.name }}"
+          description: >
+            Container {{ $labels.name }} is using
+            {{ $value | humanizePercentage }} of its memory limit for the
+            past 10 minutes.
+          runbook: "https://github.com/openclaw/lobster-engine/wiki/runbooks/memory-high"
+
+  # ---------------------------------------------------------------------------
+  # NATS connectivity
+  # ---------------------------------------------------------------------------
+  - name: nats
+    rules:
+      - alert: NATSDisconnected
+        # Fires when the NATS server becomes unreachable (no scrape data).
+        # 'up' is 0 when Prometheus cannot reach the target.
+        expr: up{job="nats"} == 0
+        for: 0m
+        labels:
+          severity: critical
+        annotations:
+          summary: "NATS server unreachable"
+          description: >
+            Prometheus cannot reach the NATS monitoring endpoint. The NATS
+            server may be down or the monitoring port (8222) may be blocked.
+          runbook: "https://github.com/openclaw/lobster-engine/wiki/runbooks/nats-disconnected"
+
+      - alert: NATSConnectionsDropped
+        # Fires when the number of active NATS client connections drops to zero
+        # while the server is still running.
+        expr: |
+          gnatsd_connz_total_connections == 0
+          and
+          up{job="nats"} == 1
+        for: 1m
+        labels:
+          severity: warning
+        annotations:
+          summary: "NATS has no active client connections"
+          description: >
+            The NATS server is running but reports zero active client
+            connections. All services (gateway, workers) may have disconnected.

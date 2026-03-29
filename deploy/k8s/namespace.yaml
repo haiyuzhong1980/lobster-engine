@@ -1,0 +1,7 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: lobster-engine
+  labels:
+    app.kubernetes.io/name: lobster-engine
+    app.kubernetes.io/managed-by: kubectl

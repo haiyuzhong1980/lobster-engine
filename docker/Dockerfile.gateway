@@ -1,0 +1,26 @@
+FROM node:20-slim AS base
+RUN corepack enable pnpm
+
+WORKDIR /app
+
+# Install dependencies
+COPY package.json pnpm-workspace.yaml pnpm-lock.yaml ./
+COPY packages/core/package.json packages/core/
+COPY packages/gateway/package.json packages/gateway/
+RUN pnpm install --frozen-lockfile --filter @lobster-engine/core --filter @lobster-engine/gateway
+
+# Build
+COPY tsconfig.base.json ./
+COPY packages/core/ packages/core/
+COPY packages/gateway/ packages/gateway/
+RUN pnpm --filter @lobster-engine/core build && pnpm --filter @lobster-engine/gateway build
+
+# Run
+FROM node:20-slim
+WORKDIR /app
+COPY --from=base /app/packages/gateway/dist ./dist
+COPY --from=base /app/node_modules ./node_modules
+COPY --from=base /app/packages/gateway/package.json ./
+
+EXPOSE 3000
+CMD ["node", "dist/index.js"]

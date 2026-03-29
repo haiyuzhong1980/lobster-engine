@@ -1,0 +1,59 @@
+[Unit]
+Description=Lobster Engine Worker %i
+Documentation=https://github.com/user/lobster-engine
+After=network-online.target nats.service lobster-engine.service
+Wants=network-online.target
+Requires=nats.service
+PartOf=lobster-engine.service
+
+[Service]
+Type=simple
+User=lobster
+Group=lobster
+WorkingDirectory=/opt/lobster-engine
+
+# %i is the instance identifier (1, 2, 3, …)
+# Metrics port is offset from 9101 per instance so workers don't collide
+Environment=WORKER_ID=%i
+Environment=METRICS_PORT=910%i
+
+# Environment — override via /etc/lobster-engine/worker.env
+EnvironmentFile=-/etc/lobster-engine/worker.env
+Environment=NODE_ENV=production
+Environment=LOG_LEVEL=info
+
+ExecStart=/usr/local/bin/node /opt/lobster-engine/dist/worker.js
+ExecReload=/bin/kill -HUP $MAINPID
+
+# Restart policy
+Restart=on-failure
+RestartSec=5s
+StartLimitBurst=5
+StartLimitIntervalSec=60s
+
+# Resource limits
+LimitNOFILE=65536
+LimitNPROC=4096
+
+# Security hardening
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+RestrictSUIDSGID=yes
+LockPersonality=yes
+
+# Logging
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=lobster-worker-%i
+
+[Install]
+WantedBy=multi-user.target
+# To enable 4 workers:
+#   systemctl enable lobster-worker@{1,2,3,4}.service
+#   systemctl start  lobster-worker@{1,2,3,4}.service

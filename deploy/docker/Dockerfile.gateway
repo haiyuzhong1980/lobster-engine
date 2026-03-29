@@ -1,0 +1,65 @@
+# =============================================================================
+# Stage 1: Build
+# =============================================================================
+FROM node:20-alpine AS build
+
+# Enable corepack so pnpm is available without a separate install step
+RUN corepack enable pnpm
+
+WORKDIR /build
+
+# Copy workspace manifests first — leverage layer caching for dependency installs
+COPY package.json pnpm-workspace.yaml pnpm-lock.yaml ./
+
+# Copy only the package.json files needed for the gateway and its deps
+COPY packages/core/package.json    packages/core/
+COPY packages/gateway/package.json packages/gateway/
+
+# Install production + dev dependencies (needed for TypeScript compilation)
+RUN pnpm install --frozen-lockfile \
+      --filter @lobster-engine/core \
+      --filter @lobster-engine/gateway
+
+# Copy source and shared TypeScript config
+COPY tsconfig.base.json ./
+COPY packages/core/    packages/core/
+COPY packages/gateway/ packages/gateway/
+
+# Build core first (gateway depends on it), then gateway
+RUN pnpm --filter @lobster-engine/core    build && \
+    pnpm --filter @lobster-engine/gateway build
+
+# Prune devDependencies from the workspace so the runtime stage is lean
+RUN pnpm --filter @lobster-engine/gateway --filter @lobster-engine/core \
+      deploy --prod /build/pruned/gateway
+
+# =============================================================================
+# Stage 2: Runtime
+# =============================================================================
+FROM node:20-alpine AS runtime
+
+# Install dumb-init for proper signal forwarding and PID 1 reaping
+RUN apk add --no-cache dumb-init
+
+# Create a non-root user/group
+RUN addgroup -S lobster && adduser -S -G lobster -u 1000 lobster
+
+WORKDIR /app
+
+# Copy the pruned production bundle (dist + node_modules, no devDeps)
+COPY --from=build --chown=lobster:lobster /build/pruned/gateway/dist        ./dist
+COPY --from=build --chown=lobster:lobster /build/pruned/gateway/node_modules ./node_modules
+COPY --from=build --chown=lobster:lobster /build/pruned/gateway/package.json ./
+
+# Switch to non-root user
+USER lobster
+
+# Gateway listens on PORT (default 3000)
+EXPOSE 3000
+
+ENV NODE_ENV=production \
+    PORT=3000
+
+# Use dumb-init as PID 1 to handle signals correctly
+ENTRYPOINT ["dumb-init", "--"]
+CMD ["node", "dist/index.js"]

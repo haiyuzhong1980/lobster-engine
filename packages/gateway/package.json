@@ -1,0 +1,44 @@
+{
+  "name": "@lobster-engine/gateway",
+  "version": "0.1.0",
+  "description": "API Gateway providing REST, WebSocket, SSE, and MCP interfaces",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/user/lobster-engine",
+    "directory": "packages/gateway"
+  },
+  "license": "MIT",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "build": "tsc",
+    "clean": "rm -rf dist",
+    "test": "vitest run",
+    "test:coverage": "vitest run --coverage",
+    "lint": "eslint src/",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@hono/node-server": "^1.13.7",
+    "@lobster-engine/core": "workspace:*",
+    "@modelcontextprotocol/sdk": "^1.28.0",
+    "hono": "^4.7.7",
+    "prom-client": "^15.1.3",
+    "ws": "^8.20.0",
+    "zod": "^4.3.6"
+  },
+  "devDependencies": {
+    "@types/ws": "^8.18.1"
+  }
+}

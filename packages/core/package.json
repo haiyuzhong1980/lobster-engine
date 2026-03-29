@@ -1,0 +1,39 @@
+{
+  "name": "@lobster-engine/core",
+  "version": "0.1.0",
+  "description": "Core engine, types, interfaces, and main LobsterEngine class",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/user/lobster-engine",
+    "directory": "packages/core"
+  },
+  "license": "MIT",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "build": "tsc",
+    "clean": "rm -rf dist",
+    "test": "vitest run",
+    "test:coverage": "vitest run --coverage",
+    "lint": "eslint src/",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "nats": "^2.29.2",
+    "pino": "^10.3.1"
+  },
+  "optionalDependencies": {
+    "pino-pretty": "^13.0.0"
+  }
+}

@@ -1,0 +1,70 @@
+---
+# ClusterIP — internal cluster access to gateway
+apiVersion: v1
+kind: Service
+metadata:
+  name: lobster-gateway
+  namespace: lobster-engine
+  labels:
+    app.kubernetes.io/name: lobster-engine
+    app.kubernetes.io/component: gateway
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: lobster-engine
+    app.kubernetes.io/component: gateway
+  ports:
+    - name: http
+      port: 80
+      targetPort: http
+      protocol: TCP
+    - name: metrics
+      port: 9090
+      targetPort: metrics
+      protocol: TCP
+
+---
+# NodePort — direct external access (development / bare-metal clusters)
+# For production on cloud providers, prefer an Ingress + LoadBalancer instead.
+apiVersion: v1
+kind: Service
+metadata:
+  name: lobster-gateway-nodeport
+  namespace: lobster-engine
+  labels:
+    app.kubernetes.io/name: lobster-engine
+    app.kubernetes.io/component: gateway
+    service-type: external
+spec:
+  type: NodePort
+  selector:
+    app.kubernetes.io/name: lobster-engine
+    app.kubernetes.io/component: gateway
+  ports:
+    - name: http
+      port: 80
+      targetPort: http
+      # nodePort is omitted — Kubernetes allocates from the 30000-32767 range.
+      # Pin it here if needed, e.g.: nodePort: 30080
+      protocol: TCP
+
+---
+# Headless service for worker — allows direct pod addressing via DNS
+apiVersion: v1
+kind: Service
+metadata:
+  name: lobster-worker
+  namespace: lobster-engine
+  labels:
+    app.kubernetes.io/name: lobster-engine
+    app.kubernetes.io/component: worker
+spec:
+  clusterIP: None
+  selector:
+    app.kubernetes.io/name: lobster-engine
+    app.kubernetes.io/component: worker
+  ports:
+    - name: metrics
+      port: 9091
+      targetPort: metrics
+      protocol: TCP
