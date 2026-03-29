@@ -23,6 +23,11 @@ class MockWebSocket extends EventEmitter {
     this.sent.push(data);
   }
 
+  ping(): void {
+    // Simulate protocol-level ping — auto-emit pong like a real client
+    this.emit('pong');
+  }
+
   close(code?: number, reason?: string): void {
     this.readyState = WebSocket.CLOSED;
     this.emit('close', code, reason);
@@ -522,44 +527,43 @@ describe('WSManager — heartbeat', () => {
   it('sends ping messages at the configured interval', async () => {
     const manager = makeManager({ heartbeatIntervalMs: 1_000 });
     const ws = new MockWebSocket();
+    const pingSpy = vi.spyOn(ws, 'ping');
     await addMockClient(manager, ws);
-    ws.sent.length = 0;
 
     manager.startHeartbeat();
     vi.advanceTimersByTime(1_000);
 
-    const pings = ws.allMessages().filter((m) => m.type === 'ping');
-    expect(pings.length).toBeGreaterThanOrEqual(1);
+    // Protocol-level ping (ws.ping()) is used instead of JSON messages
+    expect(pingSpy).toHaveBeenCalled();
     manager.stopHeartbeat();
   });
 
   it('stopHeartbeat prevents further pings', async () => {
     const manager = makeManager({ heartbeatIntervalMs: 500 });
     const ws = new MockWebSocket();
+    const pingSpy = vi.spyOn(ws, 'ping');
     await addMockClient(manager, ws);
-    ws.sent.length = 0;
 
     manager.startHeartbeat();
     manager.stopHeartbeat();
+    pingSpy.mockClear();
     vi.advanceTimersByTime(2_000);
 
-    const pings = ws.allMessages().filter((m) => m.type === 'ping');
-    expect(pings).toHaveLength(0);
+    expect(pingSpy).not.toHaveBeenCalled();
   });
 
   it('startHeartbeat is idempotent — does not double-register', async () => {
     const manager = makeManager({ heartbeatIntervalMs: 1_000 });
     const ws = new MockWebSocket();
+    const pingSpy = vi.spyOn(ws, 'ping');
     await addMockClient(manager, ws);
-    ws.sent.length = 0;
 
     manager.startHeartbeat();
     manager.startHeartbeat(); // second call should be no-op
     vi.advanceTimersByTime(1_000);
 
-    const pings = ws.allMessages().filter((m) => m.type === 'ping');
-    // Should be exactly 1, not 2
-    expect(pings).toHaveLength(1);
+    // Should be exactly 1 ping, not 2 (idempotent)
+    expect(pingSpy).toHaveBeenCalledTimes(1);
     manager.stopHeartbeat();
   });
 
