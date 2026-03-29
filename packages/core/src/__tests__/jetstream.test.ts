@@ -283,7 +283,8 @@ describe('JetStreamManager initialize()', () => {
   });
 
   it('throws when NatsClient has no connection', async () => {
-    const unconnectedNats = {} as unknown as NatsClient;
+    // getRawConnection() returns undefined to simulate a disconnected client
+    const unconnectedNats = { getRawConnection: () => undefined } as unknown as NatsClient;
     const m = new JetStreamManager(unconnectedNats, defaultConfig());
     await expect(m.initialize()).rejects.toThrow('not connected');
   });
