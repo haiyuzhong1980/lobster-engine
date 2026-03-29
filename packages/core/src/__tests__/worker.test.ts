@@ -27,7 +27,7 @@ import {
  * Ten rounds is more than enough for our deepest async chain.
  */
 async function flushPromises(): Promise<void> {
-  for (let i = 0; i < 10; i++) {
+  for (let i = 0; i < 20; i++) {
     await Promise.resolve();
   }
 }

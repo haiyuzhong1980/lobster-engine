@@ -420,7 +420,7 @@ export class GatewayServer {
         return c.json<ApiResponse<never>>(fail(sceneTypeErr), 400);
       }
       if (typeof input['sceneId'] === 'string') {
-        const sceneIdErr = validateId(input['sceneId'], 'sceneId');
+        const sceneIdErr = requireValidId(input['sceneId'], 'sceneId');
         if (sceneIdErr !== null) {
           return c.json<ApiResponse<never>>(fail(sceneIdErr), 400);
         }
@@ -439,7 +439,7 @@ export class GatewayServer {
       const sceneId =
         typeof input['sceneId'] === 'string'
           ? input['sceneId']
-          : `${sceneType}:${crypto.randomUUID()}`;
+          : `${sceneType}_${crypto.randomUUID()}`;
       const sceneName =
         typeof input['sceneName'] === 'string' ? input['sceneName'] : sceneType;
       const config =
@@ -518,6 +518,16 @@ export class GatewayServer {
       }
       if (sceneId === undefined) {
         return c.json<ApiResponse<never>>(fail('Missing required field: sceneId'), 400);
+      }
+
+      // CRIT-03: Validate user-supplied IDs at the API boundary
+      const leaveBotIdErr = requireValidId(botId, 'botId');
+      if (leaveBotIdErr !== null) {
+        return c.json<ApiResponse<never>>(fail(leaveBotIdErr), 400);
+      }
+      const leaveSceneIdErr = requireValidId(sceneId, 'sceneId');
+      if (leaveSceneIdErr !== null) {
+        return c.json<ApiResponse<never>>(fail(leaveSceneIdErr), 400);
       }
 
       const scene = this.scenes.get(sceneId);

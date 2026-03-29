@@ -520,9 +520,9 @@ describe('POST /api/v1/scenes/join', () => {
     const scene = await joinScene(server, {
       botId: bot.id,
       sceneType: 'poker',
-      sceneId: 'poker:room-42',
+      sceneId: 'poker_room-42',
     });
-    expect(scene.id).toBe('poker:room-42');
+    expect(scene.id).toBe('poker_room-42');
   });
 
   it('stores provided config on the scene', async () => {
@@ -541,14 +541,14 @@ describe('POST /api/v1/scenes/join', () => {
     const first = await joinScene(server, {
       botId: bot1.id,
       sceneType: 'chess',
-      sceneId: 'chess:shared',
+      sceneId: 'chess_shared',
     });
     expect(first).toBeDefined();
 
     const res = await server.honoApp.request('/api/v1/scenes/join', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ botId: bot2.id, sceneType: 'chess', sceneId: 'chess:shared' }),
+      body: JSON.stringify({ botId: bot2.id, sceneType: 'chess', sceneId: 'chess_shared' }),
     });
     expect(res.status).toBe(200);
   });
@@ -556,11 +556,11 @@ describe('POST /api/v1/scenes/join', () => {
   it('increments playerCount when a second bot joins an existing scene', async () => {
     const bot1 = await registerBot(server, { platform: 'a' });
     const bot2 = await registerBot(server, { platform: 'b' });
-    await joinScene(server, { botId: bot1.id, sceneType: 'chess', sceneId: 'chess:shared' });
+    await joinScene(server, { botId: bot1.id, sceneType: 'chess', sceneId: 'chess_shared' });
     const updated = await joinScene(server, {
       botId: bot2.id,
       sceneType: 'chess',
-      sceneId: 'chess:shared',
+      sceneId: 'chess_shared',
     });
     expect(updated.playerCount).toBe(2);
     expect(updated.botIds).toContain(bot1.id);
@@ -569,7 +569,7 @@ describe('POST /api/v1/scenes/join', () => {
 
   it('does not duplicate the bot when the same bot joins the same scene twice', async () => {
     const bot = await registerBot(server);
-    const sceneId = 'test:dedup';
+    const sceneId = 'test_dedup';
     await joinScene(server, { botId: bot.id, sceneType: 'quiz', sceneId });
     const second = await joinScene(server, { botId: bot.id, sceneType: 'quiz', sceneId });
     expect(second.botIds.filter((id) => id === bot.id).length).toBe(1);
@@ -651,13 +651,13 @@ describe('POST /api/v1/scenes/leave', () => {
   it('decrements playerCount when a bot leaves', async () => {
     const bot1 = await registerBot(server, { platform: 'a' });
     const bot2 = await registerBot(server, { platform: 'b' });
-    await joinScene(server, { botId: bot1.id, sceneType: 'chess', sceneId: 'chess:leave-test' });
-    await joinScene(server, { botId: bot2.id, sceneType: 'chess', sceneId: 'chess:leave-test' });
+    await joinScene(server, { botId: bot1.id, sceneType: 'chess', sceneId: 'chess_leave-test' });
+    await joinScene(server, { botId: bot2.id, sceneType: 'chess', sceneId: 'chess_leave-test' });
 
     const res = await server.honoApp.request('/api/v1/scenes/leave', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ botId: bot1.id, sceneId: 'chess:leave-test' }),
+      body: JSON.stringify({ botId: bot1.id, sceneId: 'chess_leave-test' }),
     });
     const body = await jsonBody<ApiOk<SceneRecord>>(res);
     expect(body.data.playerCount).toBe(1);
@@ -724,12 +724,12 @@ describe('GET /api/v1/scenes/:id', () => {
     const scene = await joinScene(server, {
       botId: bot.id,
       sceneType: 'trivia',
-      sceneId: 'trivia:abc',
+      sceneId: 'trivia_abc',
     });
     const res = await server.honoApp.request(`/api/v1/scenes/${scene.id}`);
     expect(res.status).toBe(200);
     const body = await jsonBody<ApiOk<SceneRecord>>(res);
-    expect(body.data.id).toBe('trivia:abc');
+    expect(body.data.id).toBe('trivia_abc');
   });
 
   it('returns 404 for an unknown scene id', async () => {
@@ -765,8 +765,8 @@ describe('GET /api/v1/scenes', () => {
 
   it('returns all scenes in the data array', async () => {
     const bot = await registerBot(server);
-    await joinScene(server, { botId: bot.id, sceneType: 'chess', sceneId: 'chess:1' });
-    await joinScene(server, { botId: bot.id, sceneType: 'chess', sceneId: 'chess:2' });
+    await joinScene(server, { botId: bot.id, sceneType: 'chess', sceneId: 'chess_1' });
+    await joinScene(server, { botId: bot.id, sceneType: 'chess', sceneId: 'chess_2' });
     const res = await server.honoApp.request('/api/v1/scenes');
     const body = await jsonBody<ApiOk<SceneRecord[]>>(res);
     expect(body.data.length).toBe(2);
@@ -774,7 +774,7 @@ describe('GET /api/v1/scenes', () => {
 
   it('returns meta with correct total count', async () => {
     const bot = await registerBot(server);
-    await joinScene(server, { botId: bot.id, sceneType: 'x', sceneId: 'x:1' });
+    await joinScene(server, { botId: bot.id, sceneType: 'x', sceneId: 'x_1' });
     const res = await server.honoApp.request('/api/v1/scenes');
     const body = await jsonBody<ApiOk<SceneRecord[]>>(res);
     expect(body.meta?.total).toBe(1);
@@ -790,7 +790,7 @@ describe('GET /api/v1/scenes', () => {
   it('respects custom page and limit query parameters', async () => {
     const bot = await registerBot(server);
     for (let i = 0; i < 5; i++) {
-      await joinScene(server, { botId: bot.id, sceneType: 'q', sceneId: `q:${i}` });
+      await joinScene(server, { botId: bot.id, sceneType: 'q', sceneId: `q_${i}` });
     }
     const res = await server.honoApp.request('/api/v1/scenes?page=2&limit=2');
     const body = await jsonBody<ApiOk<SceneRecord[]>>(res);
@@ -939,7 +939,7 @@ describe('GET /api/v1/status', () => {
 
   it('returns scenesCount reflecting the number of active scenes', async () => {
     const bot = await registerBot(server);
-    await joinScene(server, { botId: bot.id, sceneType: 'chess', sceneId: 'chess:stat' });
+    await joinScene(server, { botId: bot.id, sceneType: 'chess', sceneId: 'chess_stat' });
     const res = await server.honoApp.request('/api/v1/status');
     const body = await jsonBody<ApiOk<{ botsCount: number; scenesCount: number; uptime: number }>>(res);
     expect(body.data.scenesCount).toBe(1);
@@ -1008,8 +1008,8 @@ describe('GET /api/v1/metrics', () => {
 
   it('returns scenes.total equal to the number of created scenes', async () => {
     const bot = await registerBot(server);
-    await joinScene(server, { botId: bot.id, sceneType: 'chess', sceneId: 'chess:m1' });
-    await joinScene(server, { botId: bot.id, sceneType: 'poker', sceneId: 'poker:m1' });
+    await joinScene(server, { botId: bot.id, sceneType: 'chess', sceneId: 'chess_m1' });
+    await joinScene(server, { botId: bot.id, sceneType: 'poker', sceneId: 'poker_m1' });
     const res = await server.honoApp.request('/api/v1/metrics');
     const body = await jsonBody<ApiOk<{ scenes: { total: number; byStatus: Record<string, number> } }>>(res);
     expect(body.data.scenes.total).toBe(2);
@@ -1017,7 +1017,7 @@ describe('GET /api/v1/metrics', () => {
 
   it('groups scenes by status in scenes.byStatus', async () => {
     const bot = await registerBot(server);
-    await joinScene(server, { botId: bot.id, sceneType: 'chess', sceneId: 'chess:s1' });
+    await joinScene(server, { botId: bot.id, sceneType: 'chess', sceneId: 'chess_s1' });
 
     const res = await server.honoApp.request('/api/v1/metrics');
     const body = await jsonBody<ApiOk<{ scenes: { total: number; byStatus: Record<string, number> } }>>(res);

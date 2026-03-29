@@ -199,20 +199,19 @@ function makeJsmClient(overrides: Partial<MockJsmClient> = {}): MockJsmClient {
 }
 
 /**
- * Build a NatsClient mock with an internal `.connection` object that exposes
- * `jetstream()` and `jetstreamManager()` — matching what JetStreamManager
- * accesses via the private `requireRawConnection()` guard.
+ * Build a NatsClient mock that exposes `getRawConnection()` — matching the
+ * public method JetStreamManager now calls via `requireRawConnection()`.
  */
 function makeNatsClientWithConnection(
   jsClient: MockJsClient,
   jsmClient: MockJsmClient,
 ): NatsClient {
-  const connection = {
+  const rawConn = {
     jetstream: vi.fn().mockReturnValue(jsClient),
     jetstreamManager: vi.fn().mockResolvedValue(jsmClient),
   };
 
-  return { connection } as unknown as NatsClient;
+  return { getRawConnection: () => rawConn } as unknown as NatsClient;
 }
 
 function defaultConfig(overrides: Partial<JetStreamConfig> = {}): JetStreamConfig {
@@ -277,7 +276,7 @@ describe('JetStreamManager initialize()', () => {
   });
 
   it('calls jetstream() and jetstreamManager() on the underlying connection', async () => {
-    const conn = (natsClient as unknown as { connection: { jetstream: ReturnType<typeof vi.fn>; jetstreamManager: ReturnType<typeof vi.fn> } }).connection;
+    const conn = natsClient.getRawConnection() as { jetstream: ReturnType<typeof vi.fn>; jetstreamManager: ReturnType<typeof vi.fn> };
     await manager.initialize();
     expect(conn.jetstream).toHaveBeenCalledOnce();
     expect(conn.jetstreamManager).toHaveBeenCalledOnce();
