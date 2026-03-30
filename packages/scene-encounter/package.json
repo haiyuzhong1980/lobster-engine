@@ -1,0 +1,36 @@
+{
+  "name": "@lobster-engine/scene-encounter",
+  "version": "1.0.0",
+  "description": "Encounter scene plugin for lobster-engine — Bot-to-Bot autonomous conversation based on personality DNA",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/user/lobster-engine",
+    "directory": "packages/scene-encounter"
+  },
+  "license": "MIT",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "build": "tsc",
+    "clean": "rm -rf dist",
+    "test": "vitest run",
+    "test:coverage": "vitest run --coverage",
+    "lint": "eslint src/",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@lobster-engine/core": "workspace:*"
+  },
+  "devDependencies": {}
+}

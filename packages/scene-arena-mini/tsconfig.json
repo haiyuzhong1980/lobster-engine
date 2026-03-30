@@ -6,8 +6,6 @@
   },
   "include": ["src"],
   "references": [
-    { "path": "../core" },
-    { "path": "../scene-encounter" },
-    { "path": "../scene-life-pulse" }
+    { "path": "../core" }
   ]
 }

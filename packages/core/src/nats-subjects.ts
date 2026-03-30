@@ -74,6 +74,57 @@ export const NatsSubjects = {
   },
   workerAssign: 'worker.assign' as const,
   workerResult: 'worker.result' as const,
+
+  // Lobster activity subjects
+  lobsterActivity: (lobsterId: string): string => {
+    requireValidToken(lobsterId, 'lobsterId');
+    return `lobster.${lobsterId}.activity`;
+  },
+  lobsterEmotion: (lobsterId: string): string => {
+    requireValidToken(lobsterId, 'lobsterId');
+    return `lobster.${lobsterId}.emotion`;
+  },
+  lobsterState: (lobsterId: string): string => {
+    requireValidToken(lobsterId, 'lobsterId');
+    return `lobster.${lobsterId}.state`;
+  },
+
+  // Encounter subjects
+  encounterMatch: 'encounter.match' as const,
+  encounterConfirmed: (pairId: string): string => {
+    requireValidToken(pairId, 'pairId');
+    return `encounter.${pairId}.confirmed`;
+  },
+  encounterChat: (pairId: string): string => {
+    requireValidToken(pairId, 'pairId');
+    return `encounter.${pairId}.chat`;
+  },
+
+  // Social subjects
+  socialGroupEffect: (geoHash: string): string => {
+    requireValidToken(geoHash, 'geoHash');
+    return `social.group.${geoHash}`;
+  },
+
+  // Arena subjects
+  arenaEvent: (matchId: string): string => {
+    requireValidToken(matchId, 'matchId');
+    return `arena.${matchId}.event`;
+  },
+  arenaResult: (matchId: string): string => {
+    requireValidToken(matchId, 'matchId');
+    return `arena.${matchId}.result`;
+  },
+
+  // Diary subjects
+  diaryGenerate: (lobsterId: string): string => {
+    requireValidToken(lobsterId, 'lobsterId');
+    return `diary.${lobsterId}.generate`;
+  },
+  diaryReady: (lobsterId: string): string => {
+    requireValidToken(lobsterId, 'lobsterId');
+    return `diary.${lobsterId}.ready`;
+  },
 } as const;
 
 // ---------------------------------------------------------------------------
@@ -195,3 +246,95 @@ export const QUEUE_GATEWAY = 'lobster-gateway' as const;
 
 /** AI pool queue group — load-balanced adapter instances. */
 export const QUEUE_AI_POOL = 'lobster-ai-pool' as const;
+
+// ---------------------------------------------------------------------------
+// Lobster activity subjects
+// ---------------------------------------------------------------------------
+
+/** Activity events for a specific lobster (step count, transport mode, etc.). */
+export const lobsterActivity = (lobsterId: string): string => {
+  requireValidToken(lobsterId, 'lobsterId');
+  return `lobster.${lobsterId}.activity`;
+};
+
+/** Emotion state updates for a specific lobster. */
+export const lobsterEmotion = (lobsterId: string): string => {
+  requireValidToken(lobsterId, 'lobsterId');
+  return `lobster.${lobsterId}.emotion`;
+};
+
+/** State change notifications for a specific lobster. */
+export const lobsterState = (lobsterId: string): string => {
+  requireValidToken(lobsterId, 'lobsterId');
+  return `lobster.${lobsterId}.state`;
+};
+
+/** Subscribe to all lobster activity streams. */
+export const LOBSTER_ACTIVITY_ALL = 'lobster.*.activity' as const;
+
+/** Subscribe to all lobster emotion streams. */
+export const LOBSTER_EMOTION_ALL = 'lobster.*.emotion' as const;
+
+/** Subscribe to all lobster state streams. */
+export const LOBSTER_STATE_ALL = 'lobster.*.state' as const;
+
+// ---------------------------------------------------------------------------
+// Encounter subjects
+// ---------------------------------------------------------------------------
+
+/** Match-making request broadcast — any nearby lobster can respond. */
+export const ENCOUNTER_MATCH = 'encounter.match' as const;
+
+/** Confirmed encounter between a specific pair. */
+export const encounterConfirmed = (pairId: string): string => {
+  requireValidToken(pairId, 'pairId');
+  return `encounter.${pairId}.confirmed`;
+};
+
+/** Chat channel for a specific encounter pair. */
+export const encounterChat = (pairId: string): string => {
+  requireValidToken(pairId, 'pairId');
+  return `encounter.${pairId}.chat`;
+};
+
+// ---------------------------------------------------------------------------
+// Social subjects
+// ---------------------------------------------------------------------------
+
+/** Group effect broadcast for a geohash zone (mood, weather, bonus). */
+export const socialGroupEffect = (geoHash: string): string => {
+  requireValidToken(geoHash, 'geoHash');
+  return `social.group.${geoHash}`;
+};
+
+// ---------------------------------------------------------------------------
+// Arena subjects
+// ---------------------------------------------------------------------------
+
+/** Real-time events for a specific arena match. */
+export const arenaEvent = (matchId: string): string => {
+  requireValidToken(matchId, 'matchId');
+  return `arena.${matchId}.event`;
+};
+
+/** Final result for a specific arena match. */
+export const arenaResult = (matchId: string): string => {
+  requireValidToken(matchId, 'matchId');
+  return `arena.${matchId}.result`;
+};
+
+// ---------------------------------------------------------------------------
+// Diary subjects
+// ---------------------------------------------------------------------------
+
+/** Trigger diary generation for a specific lobster. */
+export const diaryGenerate = (lobsterId: string): string => {
+  requireValidToken(lobsterId, 'lobsterId');
+  return `diary.${lobsterId}.generate`;
+};
+
+/** Diary content ready for a specific lobster. */
+export const diaryReady = (lobsterId: string): string => {
+  requireValidToken(lobsterId, 'lobsterId');
+  return `diary.${lobsterId}.ready`;
+};

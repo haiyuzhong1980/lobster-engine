@@ -95,3 +95,64 @@ export * from './nats-subjects.js';
 
 export type { LogContext } from './logger.js';
 export { createLogger, withTraceId, generateTraceId } from './logger.js';
+
+// ---------------------------------------------------------------------------
+// Lobster companion product — shared types
+// ---------------------------------------------------------------------------
+
+export type {
+  ActivityType,
+  ActivityEvent,
+  LobsterBehavior,
+  EmotionType,
+  EmotionIntensity,
+  EmotionState,
+  EmotionTrigger,
+  PersonalityDNA,
+  PersonalityTrait,
+  PersonalityDrift,
+  WeatherCondition,
+  WeatherData,
+  RelationLevel,
+  EncounterEvent,
+  EncounterRecord,
+  SocialRelation,
+  LobsterState,
+  LobsterStats,
+  DiaryEntry,
+  DiaryTimelineItem,
+  DiarySummary,
+  ArenaMode,
+  ArenaMatch,
+  ArenaResult,
+  IncentiveReward,
+} from './lobster-types.js';
+
+export { EmotionEngine } from './emotion.js';
+
+// ---------------------------------------------------------------------------
+// Social system — B.5/B.6
+// ---------------------------------------------------------------------------
+
+export type {
+  UpgradeRequirements,
+  GeoReport,
+  GroupEffect,
+  GroupEffectType,
+  ShellReward,
+} from './social.js';
+export { RelationManager, GroupEffectDetector, ShellEconomy } from './social.js';
+
+// ---------------------------------------------------------------------------
+// Personality DNA Engine — A.3
+// ---------------------------------------------------------------------------
+
+export type { WeeklyBehaviorStats, DialogueStyle } from './personality.js';
+export { PersonalityEngine } from './personality.js';
+
+// ---------------------------------------------------------------------------
+// Weather Service — A.6
+// ---------------------------------------------------------------------------
+
+export type { WeatherServiceConfig, LobsterWeatherEffect } from './weather.js';
+export { WeatherService } from './weather.js';

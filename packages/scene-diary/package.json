@@ -1,7 +1,7 @@
 {
-  "name": "@lobster-engine/gateway",
+  "name": "@lobster-engine/scene-diary",
   "version": "0.1.0",
-  "description": "API Gateway providing REST, WebSocket, SSE, and MCP interfaces",
+  "description": "Diary scene plugin for lobster-engine — generates end-of-day AI diary from the lobster's perspective",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "files": [
@@ -15,7 +15,7 @@
   "repository": {
     "type": "git",
     "url": "https://github.com/user/lobster-engine",
-    "directory": "packages/gateway"
+    "directory": "packages/scene-diary"
   },
   "license": "MIT",
   "engines": {
@@ -30,17 +30,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@hono/node-server": "^1.13.7",
-    "@lobster-engine/core": "workspace:*",
-    "@lobster-engine/scene-encounter": "workspace:*",
-    "@lobster-engine/scene-life-pulse": "workspace:*",
-    "@modelcontextprotocol/sdk": "^1.28.0",
-    "hono": "^4.7.7",
-    "prom-client": "^15.1.3",
-    "ws": "^8.20.0",
-    "zod": "^4.3.6"
+    "@lobster-engine/core": "workspace:*"
   },
-  "devDependencies": {
-    "@types/ws": "^8.18.1"
-  }
+  "devDependencies": {}
 }

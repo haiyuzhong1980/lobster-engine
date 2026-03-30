@@ -9,8 +9,30 @@ import { createAuthMiddleware, InMemoryApiKeyStore } from './middleware/auth.js'
 import type { AuthConfig } from './middleware/auth.js';
 import { createCorsMiddleware, createSecurityHeadersMiddleware } from './middleware/cors.js';
 import { createRateLimitMiddleware } from './middleware/rate-limit.js';
-import type { NatsClient } from '@lobster-engine/core';
-import { NatsSubjects, validateSubjectToken } from '@lobster-engine/core';
+import type {
+  NatsClient,
+  SocialRelation,
+  RelationLevel,
+  EncounterRecord,
+  ActivityType,
+  LobsterState,
+  LobsterStats,
+  EmotionState,
+  PersonalityDNA,
+  DiaryEntry,
+} from '@lobster-engine/core';
+import {
+  NatsSubjects,
+  validateSubjectToken,
+  RelationManager,
+  ShellEconomy,
+  GroupEffectDetector,
+  EmotionEngine,
+  PersonalityEngine,
+  WeatherService,
+} from '@lobster-engine/core';
+import { EncounterMatcher } from '@lobster-engine/scene-encounter';
+import { LifePulsePlugin } from '@lobster-engine/scene-life-pulse';
 
 // ---------------------------------------------------------------------------
 // Config
@@ -28,6 +50,71 @@ export interface GatewayConfig {
   readonly useNats?: boolean;
   /** Optional NatsClient to use for event publishing. */
   readonly nats?: NatsClient;
+}
+
+// ---------------------------------------------------------------------------
+// Encounter / Social in-memory data models
+// ---------------------------------------------------------------------------
+
+/** Maximum encounter history entries kept in memory. */
+const MAX_ENCOUNTER_HISTORY = 1000;
+
+/** Maximum encounter records returned per history query. */
+const ENCOUNTER_HISTORY_LIMIT = 50;
+
+/** Shell balance entry tracked per lobster. */
+interface ShellBalance {
+  readonly lobsterId: string;
+  readonly amount: number;
+}
+
+/** Internal encounter history entry (extended from EncounterRecord for routing). */
+export interface EncounterHistoryEntry extends EncounterRecord {
+  // All fields from EncounterRecord are inherited as-is
+}
+
+/** Body for POST /api/v1/encounter/report */
+export interface EncounterReportBody {
+  readonly reporterId: string;
+  readonly peerId: string;
+  readonly method: 'ble' | 'gps';
+  readonly rssi?: number;
+  readonly geoHash?: string;
+}
+
+/** Body for POST /api/v1/social/gift */
+export interface GiftBody {
+  readonly senderId: string;
+  readonly receiverId: string;
+  readonly giftType: string;
+  readonly cost: number;
+}
+
+/** Body for POST /api/v1/social/confirm */
+export interface ConfirmBody {
+  readonly lobsterId: string;
+  readonly peerId: string;
+}
+
+/** Response for POST /api/v1/encounter/report */
+export interface EncounterReportResult {
+  readonly matched: boolean;
+  readonly pairId?: string;
+  readonly relation?: SocialRelation;
+  readonly reward?: { readonly amount: number; readonly reason: string };
+}
+
+/** Response for POST /api/v1/social/gift */
+export interface GiftResult {
+  readonly relation: SocialRelation;
+  readonly senderBalance: number;
+}
+
+/** Response for POST /api/v1/social/confirm */
+export interface ConfirmResult {
+  readonly confirmed: boolean;
+  readonly upgraded: boolean;
+  readonly newLevel?: RelationLevel;
 }
 
 // ---------------------------------------------------------------------------
@@ -55,6 +142,52 @@ export interface SceneRecord {
   readonly createdAt: number;
   readonly updatedAt: number;
 }
+
+// ---------------------------------------------------------------------------
+// Lobster companion product — in-memory records
+// ---------------------------------------------------------------------------
+
+/** All valid ActivityType values as a Set for O(1) membership checks. */
+const VALID_ACTIVITY_TYPES = new Set<ActivityType>([
+  'idle', 'walking', 'running', 'cycling', 'subway', 'bus',
+  'driving', 'train', 'plane', 'boat', 'sleeping', 'eating',
+  'listening_music', 'phone_call', 'charging',
+]);
+
+/** Stored lobster record — mirrors LobsterState plus a mutable diary store. */
+export interface LobsterRecord extends LobsterState {
+  /** Latest diary entry for this lobster (undefined until one is written). */
+  readonly latestDiary?: DiaryEntry;
+}
+
+/** Lightweight activity event record persisted per POST /api/v1/lobster/activity. */
+export interface LobsterActivityRecord {
+  readonly lobsterId: string;
+  readonly type: ActivityType;
+  readonly confidence: number;
+  readonly metadata: {
+    readonly speed?: number;
+    readonly steps?: number;
+    readonly altitude?: number;
+  };
+  readonly timestamp: number;
+}
+
+/** Personality response payload including archetype and dialogue hints. */
+export interface PersonalityResponse {
+  readonly dna: PersonalityDNA;
+  readonly archetype: string;
+  readonly dialogueStyle: {
+    readonly verbosity: string;
+    readonly tone: string;
+    readonly greeting: string;
+    readonly farewell: string;
+    readonly responseToCompliment: string;
+  };
+}
+
+/** Shared WeatherService instance (mock mode — no API key). */
+const weatherService = new WeatherService({});
 
 // ---------------------------------------------------------------------------
 // API response envelope
@@ -137,6 +270,24 @@ export class GatewayServer {
 
   private readonly bots = new Map<string, BotRecord>();
   private readonly scenes = new Map<string, SceneRecord>();
+
+  /** Lobster state records keyed by lobster id. */
+  private readonly lobsters = new Map<string, LobsterRecord>();
+
+  /** Latest activity record per lobster — used for behavior / incentive lookup. */
+  private readonly lobsterActivities = new Map<string, LobsterActivityRecord>();
+
+  /** Encounter Matcher — tracks pending proximity reports for mutual match detection. */
+  private readonly encounterMatcher = new EncounterMatcher();
+
+  /** Social relations keyed by pairId (deterministic: sorted(a, b).join('::')).  */
+  private readonly relations = new Map<string, SocialRelation>();
+
+  /** Encounter history ring buffer — capped at MAX_ENCOUNTER_HISTORY (FIFO). */
+  private readonly encounterHistory: EncounterHistoryEntry[] = [];
+
+  /** Shell balances per lobster. A missing entry is treated as 0. */
+  private readonly shellBalances = new Map<string, number>();
 
   /** Per-server Prometheus registry — isolated so test instances don't clash. */
   readonly metrics: MetricsRegistry;
@@ -650,6 +801,655 @@ export class GatewayServer {
       }
 
       return c.json<ApiResponse<typeof result>>(ok(result));
+    });
+
+    // --- Encounter reporting ---
+
+    this.app.post('/api/v1/encounter/report', async (c) => {
+      let body: unknown;
+      try {
+        body = await c.req.json();
+      } catch {
+        return c.json<ApiResponse<never>>(fail('Invalid JSON body'), 400);
+      }
+
+      const input = (
+        typeof body === 'object' && body !== null ? body : {}
+      ) as Record<string, unknown>;
+
+      const reporterId = typeof input['reporterId'] === 'string' ? input['reporterId'] : undefined;
+      const peerId = typeof input['peerId'] === 'string' ? input['peerId'] : undefined;
+      const method = input['method'];
+
+      if (reporterId === undefined) {
+        return c.json<ApiResponse<never>>(fail('Missing required field: reporterId'), 400);
+      }
+      if (peerId === undefined) {
+        return c.json<ApiResponse<never>>(fail('Missing required field: peerId'), 400);
+      }
+      if (method !== 'ble' && method !== 'gps') {
+        return c.json<ApiResponse<never>>(fail('method must be "ble" or "gps"'), 400);
+      }
+
+      const reporterIdErr = requireValidId(reporterId, 'reporterId');
+      if (reporterIdErr !== null) {
+        return c.json<ApiResponse<never>>(fail(reporterIdErr), 400);
+      }
+      const peerIdErr = requireValidId(peerId, 'peerId');
+      if (peerIdErr !== null) {
+        return c.json<ApiResponse<never>>(fail(peerIdErr), 400);
+      }
+
+      if (reporterId === peerId) {
+        return c.json<ApiResponse<never>>(fail('reporterId and peerId must be different'), 400);
+      }
+
+      const geoHash =
+        typeof input['geoHash'] === 'string' ? input['geoHash'] : undefined;
+
+      // Record the one-sided report
+      this.encounterMatcher.report(reporterId, peerId, method);
+
+      const pairId = EncounterMatcher.getPairId(reporterId, peerId);
+      const matched = this.encounterMatcher.checkMatch(reporterId, peerId);
+
+      if (!matched) {
+        return c.json<ApiResponse<EncounterReportResult>>(ok({ matched: false }));
+      }
+
+      // --- Mutual match confirmed ---
+      // Clear the matched pair's pending reports so subsequent encounters
+      // are treated as discrete events rather than continuing to re-match
+      // against stale pending entries.
+      this.encounterMatcher.clearPair(reporterId, peerId);
+
+      const now = Date.now();
+      const location = geoHash ?? '';
+
+      const encounterRecord: EncounterHistoryEntry = {
+        id: crypto.randomUUID(),
+        lobsterA: pairId.split('::')[0] ?? reporterId,
+        lobsterB: pairId.split('::')[1] ?? peerId,
+        location,
+        method,
+        timestamp: now,
+        giftExchanged: false,
+        collaborationCompleted: false,
+      };
+
+      // Push to FIFO ring buffer
+      this.encounterHistory.push(encounterRecord);
+      if (this.encounterHistory.length > MAX_ENCOUNTER_HISTORY) {
+        this.encounterHistory.shift();
+      }
+
+      // Create or update the social relation
+      const existingRelation = this.relations.get(pairId);
+      const baseRelation =
+        existingRelation ?? RelationManager.createRelation(
+          encounterRecord.lobsterA,
+          encounterRecord.lobsterB,
+        );
+
+      const updatedRelation = RelationManager.processEncounter(baseRelation, encounterRecord);
+      this.relations.set(pairId, updatedRelation);
+
+      // Calculate shell reward for each participant
+      const today = new Date(now).toISOString().slice(0, 10);
+      const isFirstToday = !baseRelation.uniqueDays.includes(today);
+      const reward = ShellEconomy.encounterReward(updatedRelation, isFirstToday);
+
+      // Credit shells to both participants
+      if (reward.amount > 0) {
+        this.shellBalances.set(
+          reporterId,
+          (this.shellBalances.get(reporterId) ?? 0) + reward.amount,
+        );
+        this.shellBalances.set(
+          peerId,
+          (this.shellBalances.get(peerId) ?? 0) + reward.amount,
+        );
+      }
+
+      return c.json<ApiResponse<EncounterReportResult>>(
+        ok({
+          matched: true,
+          pairId,
+          relation: updatedRelation,
+          reward,
+        }),
+        201,
+      );
+    });
+
+    // --- Encounter history ---
+
+    this.app.get('/api/v1/encounter/history/:lobsterId', (c) => {
+      const lobsterId = c.req.param('lobsterId');
+      const idErr = requireValidId(lobsterId, 'lobsterId');
+      if (idErr !== null) {
+        return c.json<ApiResponse<never>>(fail(idErr), 400);
+      }
+
+      const records = this.encounterHistory
+        .filter((r) => r.lobsterA === lobsterId || r.lobsterB === lobsterId)
+        .slice()
+        .reverse()
+        .slice(0, ENCOUNTER_HISTORY_LIMIT);
+
+      return c.json<ApiResponse<EncounterHistoryEntry[]>>(ok(records));
+    });
+
+    // --- Social relations ---
+
+    this.app.get('/api/v1/social/:lobsterId/relations', (c) => {
+      const lobsterId = c.req.param('lobsterId');
+      const idErr = requireValidId(lobsterId, 'lobsterId');
+      if (idErr !== null) {
+        return c.json<ApiResponse<never>>(fail(idErr), 400);
+      }
+
+      const rels = Array.from(this.relations.values()).filter(
+        (r) => r.lobsterA === lobsterId || r.lobsterB === lobsterId,
+      );
+
+      return c.json<ApiResponse<SocialRelation[]>>(ok(rels));
+    });
+
+    // --- Gift sending ---
+
+    this.app.post('/api/v1/social/gift', async (c) => {
+      let body: unknown;
+      try {
+        body = await c.req.json();
+      } catch {
+        return c.json<ApiResponse<never>>(fail('Invalid JSON body'), 400);
+      }
+
+      const input = (
+        typeof body === 'object' && body !== null ? body : {}
+      ) as Record<string, unknown>;
+
+      const senderId = typeof input['senderId'] === 'string' ? input['senderId'] : undefined;
+      const receiverId = typeof input['receiverId'] === 'string' ? input['receiverId'] : undefined;
+      const giftType = typeof input['giftType'] === 'string' ? input['giftType'] : undefined;
+      const cost =
+        typeof input['cost'] === 'number' ? input['cost'] : undefined;
+
+      if (senderId === undefined) {
+        return c.json<ApiResponse<never>>(fail('Missing required field: senderId'), 400);
+      }
+      if (receiverId === undefined) {
+        return c.json<ApiResponse<never>>(fail('Missing required field: receiverId'), 400);
+      }
+      if (giftType === undefined) {
+        return c.json<ApiResponse<never>>(fail('Missing required field: giftType'), 400);
+      }
+      if (cost === undefined) {
+        return c.json<ApiResponse<never>>(fail('Missing required field: cost'), 400);
+      }
+
+      const senderIdErr = requireValidId(senderId, 'senderId');
+      if (senderIdErr !== null) {
+        return c.json<ApiResponse<never>>(fail(senderIdErr), 400);
+      }
+      const receiverIdErr = requireValidId(receiverId, 'receiverId');
+      if (receiverIdErr !== null) {
+        return c.json<ApiResponse<never>>(fail(receiverIdErr), 400);
+      }
+
+      const giftTypeErr = validateShortString(giftType, 'giftType');
+      if (giftTypeErr !== null) {
+        return c.json<ApiResponse<never>>(fail(giftTypeErr), 400);
+      }
+
+      if (!Number.isFinite(cost) || cost < 0) {
+        return c.json<ApiResponse<never>>(fail('cost must be a non-negative number'), 400);
+      }
+
+      if (senderId === receiverId) {
+        return c.json<ApiResponse<never>>(fail('senderId and receiverId must be different'), 400);
+      }
+
+      const senderBalance = this.shellBalances.get(senderId) ?? 0;
+      if (!ShellEconomy.validateGift(senderBalance, cost)) {
+        return c.json<ApiResponse<never>>(
+          fail(`Insufficient shells: sender has ${senderBalance}, gift costs ${cost}`),
+          402,
+        );
+      }
+
+      // Deduct shells from sender
+      this.shellBalances.set(senderId, senderBalance - cost);
+
+      // Ensure a relation exists between these two lobsters
+      const pairId = EncounterMatcher.getPairId(senderId, receiverId);
+      const existingRelation = this.relations.get(pairId);
+
+      const [lobsterA, lobsterB] = [senderId, receiverId].sort() as [string, string];
+      const baseRelation =
+        existingRelation ?? RelationManager.createRelation(lobsterA, lobsterB);
+
+      // Record the gift exchange on the relation
+      const updatedRelation: SocialRelation = {
+        ...baseRelation,
+        giftsExchanged: baseRelation.giftsExchanged + 1,
+        lastMet: Date.now(),
+      };
+
+      // Check if the gift itself triggers an upgrade
+      const newLevel = RelationManager.checkUpgrade(updatedRelation);
+      const finalRelation: SocialRelation =
+        newLevel !== null
+          ? { ...updatedRelation, level: newLevel, confirmedByA: false, confirmedByB: false }
+          : updatedRelation;
+
+      this.relations.set(pairId, finalRelation);
+
+      return c.json<ApiResponse<GiftResult>>(
+        ok({
+          relation: finalRelation,
+          senderBalance: this.shellBalances.get(senderId) ?? 0,
+        }),
+      );
+    });
+
+    // --- Mutual confirmation ---
+
+    this.app.post('/api/v1/social/confirm', async (c) => {
+      let body: unknown;
+      try {
+        body = await c.req.json();
+      } catch {
+        return c.json<ApiResponse<never>>(fail('Invalid JSON body'), 400);
+      }
+
+      const input = (
+        typeof body === 'object' && body !== null ? body : {}
+      ) as Record<string, unknown>;
+
+      const lobsterId = typeof input['lobsterId'] === 'string' ? input['lobsterId'] : undefined;
+      const peerId = typeof input['peerId'] === 'string' ? input['peerId'] : undefined;
+
+      if (lobsterId === undefined) {
+        return c.json<ApiResponse<never>>(fail('Missing required field: lobsterId'), 400);
+      }
+      if (peerId === undefined) {
+        return c.json<ApiResponse<never>>(fail('Missing required field: peerId'), 400);
+      }
+
+      const lobsterIdErr = requireValidId(lobsterId, 'lobsterId');
+      if (lobsterIdErr !== null) {
+        return c.json<ApiResponse<never>>(fail(lobsterIdErr), 400);
+      }
+      const peerIdErr = requireValidId(peerId, 'peerId');
+      if (peerIdErr !== null) {
+        return c.json<ApiResponse<never>>(fail(peerIdErr), 400);
+      }
+
+      if (lobsterId === peerId) {
+        return c.json<ApiResponse<never>>(fail('lobsterId and peerId must be different'), 400);
+      }
+
+      const pairId = EncounterMatcher.getPairId(lobsterId, peerId);
+      const existingRelation = this.relations.get(pairId);
+
+      if (existingRelation === undefined) {
+        return c.json<ApiResponse<never>>(
+          fail(`No relation found between "${lobsterId}" and "${peerId}"`),
+          404,
+        );
+      }
+
+      // Determine which side is confirming
+      const isA = existingRelation.lobsterA === lobsterId;
+      const withConfirmation: SocialRelation = isA
+        ? { ...existingRelation, confirmedByA: true }
+        : { ...existingRelation, confirmedByB: true };
+
+      // Check for upgrade after setting confirmation
+      const newLevel = RelationManager.checkUpgrade(withConfirmation);
+      const finalRelation: SocialRelation =
+        newLevel !== null
+          ? { ...withConfirmation, level: newLevel, confirmedByA: false, confirmedByB: false }
+          : withConfirmation;
+
+      this.relations.set(pairId, finalRelation);
+
+      return c.json<ApiResponse<ConfirmResult>>(
+        ok({
+          confirmed: true,
+          upgraded: newLevel !== null,
+          ...(newLevel !== null ? { newLevel } : {}),
+        }),
+      );
+    });
+
+    // --- Group detection ---
+
+    this.app.get('/api/v1/social/groups', (c) => {
+      const url = new URL(c.req.url);
+      const geoHashFilter = url.searchParams.get('geoHash') ?? undefined;
+
+      // Build geo reports from the recent encounter history
+      // Each unique lobster+geoHash pair from the last 50 encounters counts
+      const recentEncounters = this.encounterHistory.slice(-50);
+      const geoReports: Array<{ lobsterId: string; geoHash: string; timestamp: number }> = [];
+
+      for (const enc of recentEncounters) {
+        if (enc.location.length === 0) continue;
+        geoReports.push({ lobsterId: enc.lobsterA, geoHash: enc.location, timestamp: enc.timestamp });
+        geoReports.push({ lobsterId: enc.lobsterB, geoHash: enc.location, timestamp: enc.timestamp });
+      }
+
+      const allGroups = GroupEffectDetector.detectGroups(geoReports);
+      const groups = geoHashFilter !== undefined
+        ? allGroups.filter((g) => g.geoHash === geoHashFilter)
+        : allGroups;
+
+      return c.json<ApiResponse<typeof groups>>(ok(groups));
+    });
+
+    // =========================================================================
+    // --- Lobster companion product routes (A.4 + A.5) ---
+    // =========================================================================
+
+    // POST /api/v1/lobster/register
+    this.app.post('/api/v1/lobster/register', async (c) => {
+      let body: unknown;
+      try {
+        body = await c.req.json();
+      } catch {
+        return c.json<ApiResponse<never>>(fail('Invalid JSON body'), 400);
+      }
+
+      const input = (
+        typeof body === 'object' && body !== null ? body : {}
+      ) as Record<string, unknown>;
+
+      const name = typeof input['name'] === 'string' ? input['name'] : undefined;
+      const ownerId = typeof input['ownerId'] === 'string' ? input['ownerId'] : undefined;
+
+      if (name === undefined) {
+        return c.json<ApiResponse<never>>(fail('Missing required field: name'), 400);
+      }
+      if (ownerId === undefined) {
+        return c.json<ApiResponse<never>>(fail('Missing required field: ownerId'), 400);
+      }
+
+      const nameErr = validateShortString(name, 'name');
+      if (nameErr !== null) {
+        return c.json<ApiResponse<never>>(fail(nameErr), 400);
+      }
+      const ownerIdErr = requireValidId(ownerId, 'ownerId');
+      if (ownerIdErr !== null) {
+        return c.json<ApiResponse<never>>(fail(ownerIdErr), 400);
+      }
+
+      const id = crypto.randomUUID();
+      const now = Date.now();
+
+      const defaultStats: LobsterStats = {
+        totalSteps: 0,
+        totalEncounters: 0,
+        totalDays: 0,
+        longestIdle: 0,
+        favoriteActivity: 'idle',
+        lyingFlatIndex: 0,
+      };
+
+      const lobster: LobsterRecord = {
+        id,
+        ownerId,
+        name,
+        level: 1,
+        personality: PersonalityEngine.createDefault(),
+        emotion: EmotionEngine.createDefault(),
+        currentActivity: 'idle',
+        currentScene: 'lobster_home',
+        lazyCoin: 0,
+        shells: 0,
+        stats: defaultStats,
+        createdAt: now,
+        updatedAt: now,
+      };
+
+      this.lobsters.set(id, lobster);
+      return c.json<ApiResponse<LobsterRecord>>(ok(lobster), 201);
+    });
+
+    // GET /api/v1/lobster/:id/state
+    this.app.get('/api/v1/lobster/:id/state', (c) => {
+      const id = c.req.param('id');
+      const lobster = this.lobsters.get(id);
+      if (lobster === undefined) {
+        return c.json<ApiResponse<never>>(fail(`Lobster "${id}" not found`), 404);
+      }
+      return c.json<ApiResponse<LobsterRecord>>(ok(lobster));
+    });
+
+    // POST /api/v1/lobster/activity
+    this.app.post('/api/v1/lobster/activity', async (c) => {
+      let body: unknown;
+      try {
+        body = await c.req.json();
+      } catch {
+        return c.json<ApiResponse<never>>(fail('Invalid JSON body'), 400);
+      }
+
+      const input = (
+        typeof body === 'object' && body !== null ? body : {}
+      ) as Record<string, unknown>;
+
+      const lobsterId = typeof input['lobsterId'] === 'string' ? input['lobsterId'] : undefined;
+      const type = typeof input['type'] === 'string' ? input['type'] : undefined;
+      const rawConfidence = input['confidence'];
+
+      if (lobsterId === undefined) {
+        return c.json<ApiResponse<never>>(fail('Missing required field: lobsterId'), 400);
+      }
+      if (type === undefined) {
+        return c.json<ApiResponse<never>>(fail('Missing required field: type'), 400);
+      }
+      if (rawConfidence === undefined) {
+        return c.json<ApiResponse<never>>(fail('Missing required field: confidence'), 400);
+      }
+
+      const lobsterIdErr = requireValidId(lobsterId, 'lobsterId');
+      if (lobsterIdErr !== null) {
+        return c.json<ApiResponse<never>>(fail(lobsterIdErr), 400);
+      }
+
+      if (!VALID_ACTIVITY_TYPES.has(type as ActivityType)) {
+        return c.json<ApiResponse<never>>(
+          fail(`Invalid type: must be one of ${Array.from(VALID_ACTIVITY_TYPES).join(', ')}`),
+          400,
+        );
+      }
+
+      if (typeof rawConfidence !== 'number' || Number.isNaN(rawConfidence)) {
+        return c.json<ApiResponse<never>>(fail('confidence must be a number'), 400);
+      }
+      if (rawConfidence < 0 || rawConfidence > 1) {
+        return c.json<ApiResponse<never>>(fail('confidence must be between 0 and 1'), 400);
+      }
+
+      const activityType = type as ActivityType;
+
+      // Validate optional metadata numeric fields (NaN guard)
+      const meta = (
+        typeof input['metadata'] === 'object' &&
+        input['metadata'] !== null &&
+        !Array.isArray(input['metadata'])
+          ? (input['metadata'] as Record<string, unknown>)
+          : {}
+      );
+
+      const speed = typeof meta['speed'] === 'number' && !Number.isNaN(meta['speed'])
+        ? meta['speed']
+        : undefined;
+      const steps = typeof meta['steps'] === 'number' && !Number.isNaN(meta['steps'])
+        ? meta['steps']
+        : undefined;
+      const altitude = typeof meta['altitude'] === 'number' && !Number.isNaN(meta['altitude'])
+        ? meta['altitude']
+        : undefined;
+
+      const activityRecord: LobsterActivityRecord = {
+        lobsterId,
+        type: activityType,
+        confidence: rawConfidence,
+        metadata: { speed, steps, altitude },
+        timestamp: Date.now(),
+      };
+
+      this.lobsterActivities.set(lobsterId, activityRecord);
+
+      // Update lobster state if the lobster exists
+      const existing = this.lobsters.get(lobsterId);
+      if (existing !== undefined) {
+        const behavior = LifePulsePlugin.getBehavior(activityType);
+        const updated: LobsterRecord = {
+          ...existing,
+          currentActivity: activityType,
+          currentScene: behavior.scene,
+          updatedAt: Date.now(),
+        };
+        this.lobsters.set(lobsterId, updated);
+      }
+
+      // Calculate behavior and incentive
+      const behavior = LifePulsePlugin.getBehavior(activityType);
+      const durationMinutes = 0; // no duration context at this point; use 0
+      const incentive = LifePulsePlugin.calculateIncentive(activityType, durationMinutes, {
+        steps,
+        timestamp: activityRecord.timestamp,
+      });
+
+      const result = {
+        behavior,
+        incentive: incentive.lazyCoin > 0
+          ? { lazyCoin: incentive.lazyCoin, reason: incentive.reaction ?? '', lobsterReaction: incentive.reaction ?? '' }
+          : undefined,
+      };
+
+      return c.json<ApiResponse<typeof result>>(ok(result));
+    });
+
+    // PATCH /api/v1/lobster/:id/emotion
+    this.app.patch('/api/v1/lobster/:id/emotion', async (c) => {
+      const id = c.req.param('id');
+      const lobster = this.lobsters.get(id);
+      if (lobster === undefined) {
+        return c.json<ApiResponse<never>>(fail(`Lobster "${id}" not found`), 404);
+      }
+
+      let body: unknown;
+      try {
+        body = await c.req.json();
+      } catch {
+        return c.json<ApiResponse<never>>(fail('Invalid JSON body'), 400);
+      }
+
+      const input = (
+        typeof body === 'object' && body !== null ? body : {}
+      ) as Record<string, unknown>;
+
+      const trigger = typeof input['trigger'] === 'string' ? input['trigger'] : undefined;
+      if (trigger === undefined) {
+        return c.json<ApiResponse<never>>(fail('Missing required field: trigger'), 400);
+      }
+
+      const emotionTrigger = EmotionEngine.TRIGGERS[trigger];
+      if (emotionTrigger === undefined) {
+        return c.json<ApiResponse<never>>(
+          fail(`Unknown trigger: "${trigger}". Valid triggers: ${Object.keys(EmotionEngine.TRIGGERS).join(', ')}`),
+          400,
+        );
+      }
+
+      const newEmotion: EmotionState = EmotionEngine.applyTrigger(lobster.emotion, emotionTrigger);
+      const updated: LobsterRecord = {
+        ...lobster,
+        emotion: newEmotion,
+        updatedAt: Date.now(),
+      };
+      this.lobsters.set(id, updated);
+
+      return c.json<ApiResponse<EmotionState>>(ok(newEmotion));
+    });
+
+    // GET /api/v1/lobster/:id/diary
+    this.app.get('/api/v1/lobster/:id/diary', (c) => {
+      const id = c.req.param('id');
+      const lobster = this.lobsters.get(id);
+      if (lobster === undefined) {
+        return c.json<ApiResponse<never>>(fail(`Lobster "${id}" not found`), 404);
+      }
+      if (lobster.latestDiary === undefined) {
+        return c.json<ApiResponse<never>>(fail(`No diary entries found for lobster "${id}"`), 404);
+      }
+      return c.json<ApiResponse<DiaryEntry>>(ok(lobster.latestDiary));
+    });
+
+    // GET /api/v1/lobster/:id/personality
+    this.app.get('/api/v1/lobster/:id/personality', (c) => {
+      const id = c.req.param('id');
+      const lobster = this.lobsters.get(id);
+      if (lobster === undefined) {
+        return c.json<ApiResponse<never>>(fail(`Lobster "${id}" not found`), 404);
+      }
+
+      const archetype = PersonalityEngine.getArchetype(lobster.personality);
+      const dialogueStyle = PersonalityEngine.getDialogueStyle(lobster.personality);
+
+      const result: PersonalityResponse = {
+        dna: lobster.personality,
+        archetype,
+        dialogueStyle,
+      };
+      return c.json<ApiResponse<PersonalityResponse>>(ok(result));
+    });
+
+    // GET /api/v1/weather
+    this.app.get('/api/v1/weather', async (c) => {
+      const url = new URL(c.req.url);
+      const rawLat = url.searchParams.get('lat');
+      const rawLon = url.searchParams.get('lon');
+
+      if (rawLat === null || rawLon === null) {
+        return c.json<ApiResponse<never>>(fail('Missing required query params: lat, lon'), 400);
+      }
+
+      const lat = parseFloat(rawLat);
+      const lon = parseFloat(rawLon);
+
+      if (Number.isNaN(lat)) {
+        return c.json<ApiResponse<never>>(fail('Invalid query param: lat must be a number'), 400);
+      }
+      if (Number.isNaN(lon)) {
+        return c.json<ApiResponse<never>>(fail('Invalid query param: lon must be a number'), 400);
+      }
+      if (lat < -90 || lat > 90) {
+        return c.json<ApiResponse<never>>(fail('lat must be between -90 and 90'), 400);
+      }
+      if (lon < -180 || lon > 180) {
+        return c.json<ApiResponse<never>>(fail('lon must be between -180 and 180'), 400);
+      }
+
+      let weatherData;
+      try {
+        weatherData = await weatherService.getWeather(lat, lon);
+      } catch (err) {
+        // eslint-disable-next-line no-console -- intentional server-side error log
+        console.error('[GatewayServer] Weather fetch error:', err);
+        return c.json<ApiResponse<never>>(fail('Failed to fetch weather data'), 502);
+      }
+
+      const effect = WeatherService.mapToLobsterEffect(weatherData);
+      return c.json<ApiResponse<{ weather: typeof weatherData; effect: typeof effect }>>(
+        ok({ weather: weatherData, effect }),
+      );
     });
 
     // --- OpenAPI documentation ---
