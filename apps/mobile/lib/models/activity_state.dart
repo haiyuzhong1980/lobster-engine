@@ -1,29 +1,16 @@
-import 'package:freezed_annotation/freezed_annotation.dart';
-
-part 'activity_state.freezed.dart';
-part 'activity_state.g.dart';
+// ignore_for_file: prefer_double_quotes
 
 /// Types of activities the lobster may be engaged in.
 enum ActivityType {
-  @JsonValue('lying_flat')
   lyingFlat,
-  @JsonValue('snacking')
   snacking,
-  @JsonValue('napping')
   napping,
-  @JsonValue('strolling')
   strolling,
-  @JsonValue('bubble_watching')
   bubbleWatching,
-  @JsonValue('deep_thinking')
   deepThinking,
-  @JsonValue('socializing')
   socializing,
-  @JsonValue('collecting_shells')
   collectingShells,
-  @JsonValue('stargazing')
   stargazing,
-  @JsonValue('cloud_counting')
   cloudCounting,
 }
 
@@ -57,17 +44,11 @@ extension ActivityTypeDisplay on ActivityType {
 
 /// The active scene/environment a lobster inhabits.
 enum SceneType {
-  @JsonValue('ocean_floor')
   oceanFloor,
-  @JsonValue('coral_reef')
   coralReef,
-  @JsonValue('sandy_beach')
   sandyBeach,
-  @JsonValue('kelp_forest')
   kelpForest,
-  @JsonValue('deep_sea')
   deepSea,
-  @JsonValue('tide_pool')
   tidePool,
 }
 
@@ -83,25 +64,178 @@ extension SceneTypeDisplay on SceneType {
 }
 
 /// What the lobster is currently doing and where.
-@freezed
-class ActivityState with _$ActivityState {
-  const factory ActivityState({
-    required ActivityType activity,
-    required SceneType scene,
+class ActivityState {
+  const ActivityState({
+    required this.activity,
+    required this.scene,
+    this.lyingFlatIndex = 3,
+    this.narrativeDescription,
+    this.lobsterQuote,
+    required this.startedAt,
+  });
 
-    /// Lying-flat index 1–5 (how deeply the lobster is tangping).
-    @Default(3) int lyingFlatIndex,
+  final ActivityType activity;
+  final SceneType scene;
 
-    /// Narrative line describing the current activity.
+  /// Lying-flat index 1–5 (how deeply the lobster is tangping).
+  final int lyingFlatIndex;
+
+  /// Narrative line describing the current activity.
+  final String? narrativeDescription;
+
+  /// A quote from the lobster reflecting on life.
+  final String? lobsterQuote;
+
+  /// ISO-8601 timestamp when this activity started.
+  final String startedAt;
+
+  ActivityState copyWith({
+    ActivityType? activity,
+    SceneType? scene,
+    int? lyingFlatIndex,
     String? narrativeDescription,
-
-    /// A quote from the lobster reflecting on life.
     String? lobsterQuote,
+    String? startedAt,
+  }) {
+    return ActivityState(
+      activity: activity ?? this.activity,
+      scene: scene ?? this.scene,
+      lyingFlatIndex: lyingFlatIndex ?? this.lyingFlatIndex,
+      narrativeDescription: narrativeDescription ?? this.narrativeDescription,
+      lobsterQuote: lobsterQuote ?? this.lobsterQuote,
+      startedAt: startedAt ?? this.startedAt,
+    );
+  }
 
-    /// ISO-8601 timestamp when this activity started.
-    required String startedAt,
-  }) = _ActivityState;
+  factory ActivityState.fromJson(Map<String, Object?> json) {
+    return ActivityState(
+      activity: _activityTypeFromJson(json['activity'] as String?),
+      scene: _sceneTypeFromJson(json['scene'] as String?),
+      lyingFlatIndex: (json['lyingFlatIndex'] as num?)?.toInt() ?? 3,
+      narrativeDescription: json['narrativeDescription'] as String?,
+      lobsterQuote: json['lobsterQuote'] as String?,
+      startedAt: json['startedAt'] as String? ?? '',
+    );
+  }
 
-  factory ActivityState.fromJson(Map<String, Object?> json) =>
-      _$ActivityStateFromJson(json);
+  Map<String, Object?> toJson() {
+    return {
+      'activity': _activityTypeToJson(activity),
+      'scene': _sceneTypeToJson(scene),
+      'lyingFlatIndex': lyingFlatIndex,
+      if (narrativeDescription != null)
+        'narrativeDescription': narrativeDescription,
+      if (lobsterQuote != null) 'lobsterQuote': lobsterQuote,
+      'startedAt': startedAt,
+    };
+  }
+
+  @override
+  bool operator ==(Object other) {
+    return other is ActivityState &&
+        other.activity == activity &&
+        other.scene == scene &&
+        other.lyingFlatIndex == lyingFlatIndex &&
+        other.narrativeDescription == narrativeDescription &&
+        other.lobsterQuote == lobsterQuote &&
+        other.startedAt == startedAt;
+  }
+
+  @override
+  int get hashCode => Object.hash(
+        activity,
+        scene,
+        lyingFlatIndex,
+        narrativeDescription,
+        lobsterQuote,
+        startedAt,
+      );
+}
+
+ActivityType _activityTypeFromJson(String? value) {
+  switch (value) {
+    case 'lying_flat':
+      return ActivityType.lyingFlat;
+    case 'snacking':
+      return ActivityType.snacking;
+    case 'napping':
+      return ActivityType.napping;
+    case 'strolling':
+      return ActivityType.strolling;
+    case 'bubble_watching':
+      return ActivityType.bubbleWatching;
+    case 'deep_thinking':
+      return ActivityType.deepThinking;
+    case 'socializing':
+      return ActivityType.socializing;
+    case 'collecting_shells':
+      return ActivityType.collectingShells;
+    case 'stargazing':
+      return ActivityType.stargazing;
+    case 'cloud_counting':
+      return ActivityType.cloudCounting;
+    default:
+      return ActivityType.lyingFlat;
+  }
+}
+
+String _activityTypeToJson(ActivityType type) {
+  switch (type) {
+    case ActivityType.lyingFlat:
+      return 'lying_flat';
+    case ActivityType.snacking:
+      return 'snacking';
+    case ActivityType.napping:
+      return 'napping';
+    case ActivityType.strolling:
+      return 'strolling';
+    case ActivityType.bubbleWatching:
+      return 'bubble_watching';
+    case ActivityType.deepThinking:
+      return 'deep_thinking';
+    case ActivityType.socializing:
+      return 'socializing';
+    case ActivityType.collectingShells:
+      return 'collecting_shells';
+    case ActivityType.stargazing:
+      return 'stargazing';
+    case ActivityType.cloudCounting:
+      return 'cloud_counting';
+  }
+}
+
+SceneType _sceneTypeFromJson(String? value) {
+  switch (value) {
+    case 'ocean_floor':
+      return SceneType.oceanFloor;
+    case 'coral_reef':
+      return SceneType.coralReef;
+    case 'sandy_beach':
+      return SceneType.sandyBeach;
+    case 'kelp_forest':
+      return SceneType.kelpForest;
+    case 'deep_sea':
+      return SceneType.deepSea;
+    case 'tide_pool':
+      return SceneType.tidePool;
+    default:
+      return SceneType.oceanFloor;
+  }
+}
+
+String _sceneTypeToJson(SceneType scene) {
+  switch (scene) {
+    case SceneType.oceanFloor:
+      return 'ocean_floor';
+    case SceneType.coralReef:
+      return 'coral_reef';
+    case SceneType.sandyBeach:
+      return 'sandy_beach';
+    case SceneType.kelpForest:
+      return 'kelp_forest';
+    case SceneType.deepSea:
+      return 'deep_sea';
+    case SceneType.tidePool:
+      return 'tide_pool';
+  }
 }

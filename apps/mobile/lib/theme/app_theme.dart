@@ -161,7 +161,7 @@ ThemeData buildDarkTheme() {
     ),
 
     // Cards
-    cardTheme: CardTheme(
+    cardTheme: CardThemeData(
       color: AppColors.cardDark,
       elevation: 0,
       shape: RoundedRectangleBorder(
@@ -270,7 +270,7 @@ ThemeData buildDarkTheme() {
     ),
 
     // Dialogs
-    dialogTheme: DialogTheme(
+    dialogTheme: DialogThemeData(
       backgroundColor: AppColors.cardDark,
       elevation: 0,
       shape: RoundedRectangleBorder(
@@ -367,7 +367,7 @@ ThemeData buildLightTheme() {
       ),
       iconTheme: const IconThemeData(color: AppColors.textDark),
     ),
-    cardTheme: CardTheme(
+    cardTheme: CardThemeData(
       color: Colors.white,
       elevation: 0,
       shape: RoundedRectangleBorder(

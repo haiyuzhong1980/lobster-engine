@@ -1,10 +1,8 @@
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hive_flutter/hive_flutter.dart';
-import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import 'package:tangping_lobster/models/personality_dna.dart';
 import 'package:tangping_lobster/providers/api_providers.dart';
-
-part 'personality_provider.g.dart';
 
 const _hiveBoxName = 'personality';
 const _hiveKeyPrefix = 'personality_';
@@ -14,8 +12,7 @@ const _hiveKeyPrefix = 'personality_';
 /// - Fetches from the /personality endpoint on first build.
 /// - Caches the result in Hive for offline use.
 /// - Exposes [refresh] for manual re-fetch after evolution events.
-@riverpod
-class PersonalityNotifier extends _$PersonalityNotifier {
+class PersonalityNotifier extends FamilyAsyncNotifier<PersonalityDna, String> {
   late final Box<Map<dynamic, dynamic>> _box;
 
   @override
@@ -31,16 +28,14 @@ class PersonalityNotifier extends _$PersonalityNotifier {
   /// Re-fetch the personality DNA from the server.
   Future<void> refresh() async {
     state = const AsyncLoading();
-    state = await AsyncValue.guard(() => _fetchAndCache(lobsterId));
+    state = await AsyncValue.guard(() => _fetchAndCache(arg));
   }
 
   /// Returns the dominant [PersonalityArchetype] or null if loading.
-  PersonalityArchetype? get archetype =>
-      state.valueOrNull?.archetype;
+  PersonalityArchetype? get archetype => state.valueOrNull?.archetype;
 
   /// Returns all traits, or an empty list if loading.
-  List<PersonalityTrait> get traits =>
-      state.valueOrNull?.traits ?? const [];
+  List<PersonalityTrait> get traits => state.valueOrNull?.traits ?? const [];
 
   // -------------------------------------------------------------------------
   // Internal helpers
@@ -61,7 +56,7 @@ class PersonalityNotifier extends _$PersonalityNotifier {
 
   Future<void> _cache(PersonalityDna dna) async {
     await _box.put(
-      '$_hiveKeyPrefix$lobsterId',
+      '$_hiveKeyPrefix$arg',
       Map<String, Object?>.from(dna.toJson()),
     );
   }
@@ -76,3 +71,9 @@ class PersonalityNotifier extends _$PersonalityNotifier {
     }
   }
 }
+
+/// Family provider for [PersonalityNotifier].
+final personalityNotifierProvider =
+    AsyncNotifierProviderFamily<PersonalityNotifier, PersonalityDna, String>(
+  PersonalityNotifier.new,
+);

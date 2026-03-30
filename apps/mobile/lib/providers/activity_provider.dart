@@ -1,13 +1,11 @@
 import 'dart:async';
 import 'dart:math' as math;
 
-import 'package:riverpod_annotation/riverpod_annotation.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:sensors_plus/sensors_plus.dart';
 
 import 'package:tangping_lobster/models/activity.dart';
 import 'package:tangping_lobster/providers/api_providers.dart';
-
-part 'activity_provider.g.dart';
 
 /// Report debounce — we only send to the server when activity changes
 /// or every [_serverReportInterval].
@@ -29,8 +27,7 @@ const _runningThreshold = 6.0;
 /// - Subscribes to accelerometer events from `sensors_plus`.
 /// - Classifies motion based on magnitude window.
 /// - Reports to the server on activity transitions and periodically.
-@riverpod
-class ActivityNotifier extends _$ActivityNotifier {
+class ActivityNotifier extends FamilyNotifier<SensorState, String> {
   StreamSubscription<AccelerometerEvent>? _sensorSub;
   Timer? _reportTimer;
 
@@ -136,11 +133,12 @@ class ActivityNotifier extends _$ActivityNotifier {
     return ratio.clamp(0.0, 1.0);
   }
 
-  Future<void> _sendReport(SensorActivityType activity, double confidence) async {
+  Future<void> _sendReport(
+      SensorActivityType activity, double confidence) async {
     try {
       final api = ref.read(apiServiceProvider);
       await api.reportActivity(
-        lobsterId,
+        arg,
         activity.name,
         confidence,
         metadata: {
@@ -152,3 +150,9 @@ class ActivityNotifier extends _$ActivityNotifier {
     }
   }
 }
+
+/// Family provider for [ActivityNotifier].
+final activityNotifierProvider =
+    NotifierProviderFamily<ActivityNotifier, SensorState, String>(
+  ActivityNotifier.new,
+);

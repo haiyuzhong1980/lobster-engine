@@ -1,13 +1,11 @@
 import 'dart:async';
 
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hive_flutter/hive_flutter.dart';
-import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import 'package:tangping_lobster/models/encounter.dart';
 import 'package:tangping_lobster/providers/api_providers.dart';
 import 'package:tangping_lobster/services/ws_service.dart';
-
-part 'encounter_provider.g.dart';
 
 const _hiveBoxName = 'encounters';
 const _hiveKeyPrefix = 'encounters_';
@@ -17,8 +15,8 @@ const _hiveKeyPrefix = 'encounters_';
 /// - Fetches encounter history from the API on first build.
 /// - Caches the list in Hive for offline browsing.
 /// - Auto-prepends new encounters when [WsEncounterEvent] arrives.
-@riverpod
-class EncounterNotifier extends _$EncounterNotifier {
+class EncounterNotifier
+    extends FamilyAsyncNotifier<List<EncounterRecord>, String> {
   late final Box<List<dynamic>> _box;
   StreamSubscription<WsEvent>? _wsSub;
 
@@ -46,7 +44,7 @@ class EncounterNotifier extends _$EncounterNotifier {
   }) async {
     final api = ref.read(apiServiceProvider);
     final result = await api.reportEncounter(
-      lobsterId,
+      arg,
       peerId,
       method.name,
       rssi: rssi,
@@ -64,7 +62,7 @@ class EncounterNotifier extends _$EncounterNotifier {
   /// Re-fetch full encounter history from the server.
   Future<void> refresh() async {
     state = const AsyncLoading();
-    state = await AsyncValue.guard(() => _fetchAndCache(lobsterId));
+    state = await AsyncValue.guard(() => _fetchAndCache(arg));
   }
 
   // -------------------------------------------------------------------------
@@ -86,7 +84,7 @@ class EncounterNotifier extends _$EncounterNotifier {
 
   Future<void> _cacheList(List<EncounterRecord> records) async {
     final serialised = records.map((r) => r.toJson()).toList();
-    await _box.put('$_hiveKeyPrefix$lobsterId', serialised);
+    await _box.put('$_hiveKeyPrefix$arg', serialised);
   }
 
   List<EncounterRecord>? _readCache(String id) {
@@ -109,7 +107,7 @@ class EncounterNotifier extends _$EncounterNotifier {
     try {
       final record = EncounterRecord.fromJson(event.payload);
       // Only prepend if this encounter involves our lobster.
-      if (record.reporterId != lobsterId && record.peerId != lobsterId) return;
+      if (record.reporterId != arg && record.peerId != arg) return;
 
       final current = state.valueOrNull ?? [];
       // Avoid duplicates.
@@ -123,3 +121,9 @@ class EncounterNotifier extends _$EncounterNotifier {
     }
   }
 }
+
+/// Family provider for [EncounterNotifier].
+final encounterNotifierProvider =
+    AsyncNotifierProviderFamily<EncounterNotifier, List<EncounterRecord>, String>(
+  EncounterNotifier.new,
+);

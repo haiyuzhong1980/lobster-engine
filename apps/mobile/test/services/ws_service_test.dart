@@ -21,7 +21,12 @@ void main() {
     WsEvent parseRaw(String raw) {
       // Access via the public API surface — we replicate the internal logic
       // to unit-test the discriminated union mapping.
-      final json = jsonDecode(raw);
+      final Object? json;
+      try {
+        json = jsonDecode(raw);
+      } catch (_) {
+        return WsUnknownEvent(raw: raw);
+      }
       if (json is! Map<String, Object?>) return WsUnknownEvent(raw: raw);
       final type = json['type'];
       if (type is! String) return WsUnknownEvent(raw: raw);

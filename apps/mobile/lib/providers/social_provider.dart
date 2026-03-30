@@ -1,14 +1,12 @@
 import 'dart:async';
 
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hive_flutter/hive_flutter.dart';
-import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import 'package:tangping_lobster/models/social_relation.dart';
 import 'package:tangping_lobster/providers/api_providers.dart';
 import 'package:tangping_lobster/providers/lobster_provider.dart';
 import 'package:tangping_lobster/services/ws_service.dart';
-
-part 'social_provider.g.dart';
 
 const _hiveBoxName = 'social';
 const _hiveRelationsKey = 'relations_';
@@ -24,8 +22,8 @@ const _hiveGroupsKey = 'groups_';
 /// - Caches in Hive.
 /// - Updates on [WsSocialEvent] with event types 'gift.received',
 ///   'relation.confirmed', 'relation.updated'.
-@riverpod
-class SocialRelationsNotifier extends _$SocialRelationsNotifier {
+class SocialRelationsNotifier
+    extends FamilyAsyncNotifier<List<SocialRelation>, String> {
   late final Box<List<dynamic>> _box;
   StreamSubscription<WsEvent>? _wsSub;
 
@@ -51,10 +49,10 @@ class SocialRelationsNotifier extends _$SocialRelationsNotifier {
     required int cost,
   }) async {
     final api = ref.read(apiServiceProvider);
-    final result = await api.sendGift(lobsterId, receiverId, giftType, cost);
+    final result = await api.sendGift(arg, receiverId, giftType, cost);
     if (result.success) {
       // Invalidate lobster state so shell balance refreshes.
-      ref.invalidate(lobsterNotifierProvider(lobsterId));
+      ref.invalidate(lobsterNotifierProvider(arg));
     }
     return result;
   }
@@ -62,7 +60,7 @@ class SocialRelationsNotifier extends _$SocialRelationsNotifier {
   /// Confirm a relation with [peerId].
   Future<ConfirmResult> confirmRelation(String peerId) async {
     final api = ref.read(apiServiceProvider);
-    final result = await api.confirmRelation(lobsterId, peerId);
+    final result = await api.confirmRelation(arg, peerId);
     if (result.success && result.relation != null) {
       _upsertRelation(result.relation!);
     }
@@ -72,7 +70,7 @@ class SocialRelationsNotifier extends _$SocialRelationsNotifier {
   /// Re-fetch all relations.
   Future<void> refresh() async {
     state = const AsyncLoading();
-    state = await AsyncValue.guard(() => _fetchAndCache(lobsterId));
+    state = await AsyncValue.guard(() => _fetchAndCache(arg));
   }
 
   // -------------------------------------------------------------------------
@@ -94,7 +92,7 @@ class SocialRelationsNotifier extends _$SocialRelationsNotifier {
 
   Future<void> _cacheRelations(List<SocialRelation> relations) async {
     final serialised = relations.map((r) => r.toJson()).toList();
-    await _box.put('$_hiveRelationsKey$lobsterId', serialised);
+    await _box.put('$_hiveRelationsKey$arg', serialised);
   }
 
   List<SocialRelation>? _readRelationsCache(String id) {
@@ -131,7 +129,7 @@ class SocialRelationsNotifier extends _$SocialRelationsNotifier {
       case 'relation.confirmed':
         try {
           final relation = SocialRelation.fromJson(event.payload);
-          if (relation.lobsterId != lobsterId) return;
+          if (relation.lobsterId != arg) return;
           _upsertRelation(relation);
         } catch (_) {}
 
@@ -145,17 +143,24 @@ class SocialRelationsNotifier extends _$SocialRelationsNotifier {
   }
 }
 
+/// Family provider for [SocialRelationsNotifier].
+final socialRelationsNotifierProvider =
+    AsyncNotifierProviderFamily<SocialRelationsNotifier, List<SocialRelation>,
+        String>(
+  SocialRelationsNotifier.new,
+);
+
 // ---------------------------------------------------------------------------
 // Group effects
 // ---------------------------------------------------------------------------
 
 /// Manages active [GroupEffect]s for a geographic area.
-@riverpod
-class GroupEffectsNotifier extends _$GroupEffectsNotifier {
+class GroupEffectsNotifier
+    extends FamilyAsyncNotifier<List<GroupEffect>, String?> {
   late final Box<List<dynamic>> _box;
 
   @override
-  Future<List<GroupEffect>> build({String? geoHash}) async {
+  Future<List<GroupEffect>> build(String? geoHash) async {
     _box = await Hive.openBox<List<dynamic>>(_hiveBoxName);
     return _fetchAndCache(geoHash: geoHash);
   }
@@ -163,7 +168,7 @@ class GroupEffectsNotifier extends _$GroupEffectsNotifier {
   Future<void> refresh({String? geoHash}) async {
     state = const AsyncLoading();
     state = await AsyncValue.guard(
-      () => _fetchAndCache(geoHash: geoHash ?? this.geoHash),
+      () => _fetchAndCache(geoHash: geoHash ?? arg),
     );
   }
 
@@ -204,3 +209,9 @@ class GroupEffectsNotifier extends _$GroupEffectsNotifier {
     }
   }
 }
+
+/// Family provider for [GroupEffectsNotifier] parameterised by optional geoHash.
+final groupEffectsNotifierProvider =
+    AsyncNotifierProviderFamily<GroupEffectsNotifier, List<GroupEffect>, String?>(
+  GroupEffectsNotifier.new,
+);

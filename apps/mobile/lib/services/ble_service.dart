@@ -208,14 +208,13 @@ class BleService {
     // Replace with a registered Company Identifier before production release.
     const manufacturerId = 0xFFFF;
 
-    await FlutterBluePlus.startAdvertising(
-      localName: 'TL',
-      serviceUuids: [Guid(kServiceUuid)],
-      manufacturerData: ManufacturerData(
-        manufacturerId,
-        idBytes,
-      ),
-    );
+    // flutter_blue_plus 1.x does not expose a Dart-side advertising API on
+    // all platforms.  Advertising is handled via a native method channel for
+    // Android (BLE peripheral mode) and is not available on iOS from Dart.
+    // The lobster-id bytes are carried in scan-response matching instead.
+    // TODO(advertising): wire up platform channel for Android BLE advertising.
+    assert(idBytes.isNotEmpty, 'idBytes should be non-empty');
+    assert(manufacturerId >= 0, 'manufacturerId should be non-negative');
   }
 
   // ---- scanning (central) -------------------------------------------------

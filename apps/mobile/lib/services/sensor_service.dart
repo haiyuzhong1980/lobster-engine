@@ -14,8 +14,8 @@ import 'package:tangping_lobster/models/activity.dart';
 
 /// Immutable snapshot of fused sensor state at a moment in time.
 ///
-/// [type] uses the shared [ActivityType] from the model layer so it can be
-/// forwarded directly to [ActivityReport] without conversion.
+/// [type] uses the shared [SensorActivityType] from the model layer so it can
+/// be forwarded directly to [ActivityReport] without conversion.
 class ActivityReading {
   /// Creates an [ActivityReading].
   const ActivityReading({
@@ -27,8 +27,8 @@ class ActivityReading {
     this.altitude,
   });
 
-  /// Detected activity, expressed in the canonical [ActivityType] vocabulary.
-  final ActivityType type;
+  /// Detected activity, expressed in the canonical [SensorActivityType].
+  final SensorActivityType type;
 
   /// Classifier confidence in the range 0.0–1.0.
   final double confidence;
@@ -47,7 +47,7 @@ class ActivityReading {
 
   /// Returns a copy of this reading with the supplied fields replaced.
   ActivityReading copyWith({
-    ActivityType? type,
+    SensorActivityType? type,
     double? confidence,
     DateTime? timestamp,
     double? speed,
@@ -76,9 +76,9 @@ class ActivityReading {
 
 /// High-resolution activity categories used by [SensorService._classifyActivity].
 ///
-/// These are richer than [ActivityType] (e.g. they distinguish plane from
-/// train from driving) so that the confidence scorer has more signal.
-/// They are mapped down to [ActivityType] before being emitted.
+/// These are richer than [SensorActivityType] (e.g. they distinguish plane
+/// from train from driving) so that the confidence scorer has more signal.
+/// They are mapped down to [SensorActivityType] before being emitted.
 enum _DetailedActivity {
   stationary,
   sleeping,
@@ -97,23 +97,23 @@ enum _DetailedActivity {
   charging,
 }
 
-/// Maps an internal [_DetailedActivity] to the canonical [ActivityType].
-ActivityType _toPublicType(_DetailedActivity detail) => switch (detail) {
-      _DetailedActivity.stationary => ActivityType.stationary,
-      _DetailedActivity.sleeping => ActivityType.resting,
-      _DetailedActivity.eating => ActivityType.stationary,
-      _DetailedActivity.walking => ActivityType.walking,
-      _DetailedActivity.running => ActivityType.running,
-      _DetailedActivity.cycling => ActivityType.cycling,
-      _DetailedActivity.driving => ActivityType.transit,
-      _DetailedActivity.bus => ActivityType.transit,
-      _DetailedActivity.subway => ActivityType.transit,
-      _DetailedActivity.train => ActivityType.transit,
-      _DetailedActivity.plane => ActivityType.transit,
-      _DetailedActivity.boat => ActivityType.transit,
-      _DetailedActivity.phoneCall => ActivityType.indoorActive,
-      _DetailedActivity.listeningMusic => ActivityType.stationary,
-      _DetailedActivity.charging => ActivityType.resting,
+/// Maps an internal [_DetailedActivity] to the canonical [SensorActivityType].
+SensorActivityType _toPublicType(_DetailedActivity detail) => switch (detail) {
+      _DetailedActivity.stationary => SensorActivityType.stationary,
+      _DetailedActivity.sleeping => SensorActivityType.resting,
+      _DetailedActivity.eating => SensorActivityType.stationary,
+      _DetailedActivity.walking => SensorActivityType.walking,
+      _DetailedActivity.running => SensorActivityType.running,
+      _DetailedActivity.cycling => SensorActivityType.cycling,
+      _DetailedActivity.driving => SensorActivityType.transit,
+      _DetailedActivity.bus => SensorActivityType.transit,
+      _DetailedActivity.subway => SensorActivityType.transit,
+      _DetailedActivity.train => SensorActivityType.transit,
+      _DetailedActivity.plane => SensorActivityType.transit,
+      _DetailedActivity.boat => SensorActivityType.transit,
+      _DetailedActivity.phoneCall => SensorActivityType.indoorActive,
+      _DetailedActivity.listeningMusic => SensorActivityType.stationary,
+      _DetailedActivity.charging => SensorActivityType.resting,
     };
 
 // ---------------------------------------------------------------------------

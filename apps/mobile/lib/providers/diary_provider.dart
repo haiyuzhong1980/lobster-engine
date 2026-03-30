@@ -1,12 +1,10 @@
 import 'dart:async';
 
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hive_flutter/hive_flutter.dart';
-import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import 'package:tangping_lobster/models/diary.dart';
 import 'package:tangping_lobster/providers/api_providers.dart';
-
-part 'diary_provider.g.dart';
 
 const _hiveBoxName = 'diary';
 const _hiveLatestKey = 'diary_latest_';
@@ -20,9 +18,8 @@ const _hiveTimelineKey = 'diary_timeline_';
 ///
 /// - Fetches from the /diary/latest endpoint on first build.
 /// - Caches in Hive for offline use.
-/// - [refresh] fetches both the latest entry and invaldiates the timeline.
-@riverpod
-class DiaryLatestNotifier extends _$DiaryLatestNotifier {
+/// - [refresh] fetches both the latest entry and invalidates the timeline.
+class DiaryLatestNotifier extends FamilyAsyncNotifier<DiaryEntry?, String> {
   late final Box<Map<dynamic, dynamic>> _box;
 
   @override
@@ -38,7 +35,7 @@ class DiaryLatestNotifier extends _$DiaryLatestNotifier {
   /// Re-fetch the latest diary entry.
   Future<void> refresh() async {
     state = const AsyncLoading();
-    state = await AsyncValue.guard(() => _fetchAndCache(lobsterId));
+    state = await AsyncValue.guard(() => _fetchAndCache(arg));
   }
 
   // -------------------------------------------------------------------------
@@ -60,7 +57,7 @@ class DiaryLatestNotifier extends _$DiaryLatestNotifier {
 
   Future<void> _cacheLatest(DiaryEntry entry) async {
     await _box.put(
-      '$_hiveLatestKey$lobsterId',
+      '$_hiveLatestKey$arg',
       Map<String, Object?>.from(entry.toJson()),
     );
   }
@@ -76,6 +73,12 @@ class DiaryLatestNotifier extends _$DiaryLatestNotifier {
   }
 }
 
+/// Family provider for [DiaryLatestNotifier].
+final diaryLatestNotifierProvider =
+    AsyncNotifierProviderFamily<DiaryLatestNotifier, DiaryEntry?, String>(
+  DiaryLatestNotifier.new,
+);
+
 // ---------------------------------------------------------------------------
 // Diary timeline (paginated)
 // ---------------------------------------------------------------------------
@@ -85,8 +88,8 @@ class DiaryLatestNotifier extends _$DiaryLatestNotifier {
 /// - Loads the first page on build.
 /// - Appends more entries when [loadNextPage] is called.
 /// - Caches the accumulated entries in Hive.
-@riverpod
-class DiaryTimelineNotifier extends _$DiaryTimelineNotifier {
+class DiaryTimelineNotifier
+    extends FamilyAsyncNotifier<List<DiaryEntry>, String> {
   late final Box<List<dynamic>> _box;
   int _currentPage = 1;
   bool _hasMore = true;
@@ -135,7 +138,7 @@ class DiaryTimelineNotifier extends _$DiaryTimelineNotifier {
     try {
       final api = ref.read(apiServiceProvider);
       final timeline = await api.getDiaryTimeline(
-        lobsterId,
+        arg,
         page: page,
         limit: _pageSize,
       );
@@ -150,7 +153,7 @@ class DiaryTimelineNotifier extends _$DiaryTimelineNotifier {
       return timeline.entries;
     } catch (_) {
       if (reset) {
-        final cached = _readTimelineCache(lobsterId);
+        final cached = _readTimelineCache(arg);
         if (cached != null) {
           _hasMore = false;
           return cached;
@@ -162,7 +165,7 @@ class DiaryTimelineNotifier extends _$DiaryTimelineNotifier {
 
   Future<void> _cacheTimeline(List<DiaryEntry> entries) async {
     final serialised = entries.map((e) => e.toJson()).toList();
-    await _box.put('$_hiveTimelineKey$lobsterId', serialised);
+    await _box.put('$_hiveTimelineKey$arg', serialised);
   }
 
   List<DiaryEntry>? _readTimelineCache(String id) {
@@ -178,3 +181,9 @@ class DiaryTimelineNotifier extends _$DiaryTimelineNotifier {
     }
   }
 }
+
+/// Family provider for [DiaryTimelineNotifier].
+final diaryTimelineNotifierProvider =
+    AsyncNotifierProviderFamily<DiaryTimelineNotifier, List<DiaryEntry>, String>(
+  DiaryTimelineNotifier.new,
+);

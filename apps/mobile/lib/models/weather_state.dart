@@ -1,26 +1,14 @@
 import 'package:flutter/material.dart';
-import 'package:freezed_annotation/freezed_annotation.dart';
-
-part 'weather_state.freezed.dart';
-part 'weather_state.g.dart';
 
 /// The weather types the app simulates.
 enum WeatherType {
-  @JsonValue('sunny')
   sunny,
-  @JsonValue('cloudy')
   cloudy,
-  @JsonValue('rainy')
   rainy,
-  @JsonValue('stormy')
   stormy,
-  @JsonValue('snowy')
   snowy,
-  @JsonValue('foggy')
   foggy,
-  @JsonValue('windy')
   windy,
-  @JsonValue('night_clear')
   nightClear,
 }
 
@@ -85,24 +73,126 @@ extension WeatherTypeDisplay on WeatherType {
 }
 
 /// Current weather state passed to scene and effect renderers.
-@freezed
-class WeatherState with _$WeatherState {
-  const factory WeatherState({
-    required WeatherType type,
+class WeatherState {
+  const WeatherState({
+    required this.type,
+    this.temperatureCelsius = 20,
+    this.windSpeed = 0,
+    this.rainIntensity = 0,
+    required this.updatedAt,
+  });
 
-    /// Temperature in Celsius.
-    @Default(20) int temperatureCelsius,
+  final WeatherType type;
 
-    /// Wind speed in m/s.
-    @Default(0) double windSpeed,
+  /// Temperature in Celsius.
+  final int temperatureCelsius;
 
-    /// Rain intensity 0.0–1.0 (only meaningful for rainy/stormy).
-    @Default(0) double rainIntensity,
+  /// Wind speed in m/s.
+  final double windSpeed;
 
-    /// ISO-8601 timestamp of last weather update.
-    required String updatedAt,
-  }) = _WeatherState;
+  /// Rain intensity 0.0–1.0 (only meaningful for rainy/stormy).
+  final double rainIntensity;
 
-  factory WeatherState.fromJson(Map<String, Object?> json) =>
-      _$WeatherStateFromJson(json);
+  /// ISO-8601 timestamp of last weather update.
+  final String updatedAt;
+
+  WeatherState copyWith({
+    WeatherType? type,
+    int? temperatureCelsius,
+    double? windSpeed,
+    double? rainIntensity,
+    String? updatedAt,
+  }) {
+    return WeatherState(
+      type: type ?? this.type,
+      temperatureCelsius: temperatureCelsius ?? this.temperatureCelsius,
+      windSpeed: windSpeed ?? this.windSpeed,
+      rainIntensity: rainIntensity ?? this.rainIntensity,
+      updatedAt: updatedAt ?? this.updatedAt,
+    );
+  }
+
+  factory WeatherState.fromJson(Map<String, Object?> json) {
+    return WeatherState(
+      type: _weatherTypeFromJson(json['type'] as String?),
+      temperatureCelsius:
+          (json['temperatureCelsius'] as num?)?.toInt() ?? 20,
+      windSpeed: (json['windSpeed'] as num?)?.toDouble() ?? 0,
+      rainIntensity: (json['rainIntensity'] as num?)?.toDouble() ?? 0,
+      updatedAt: json['updatedAt'] as String? ?? '',
+    );
+  }
+
+  Map<String, Object?> toJson() {
+    return {
+      'type': _weatherTypeToJson(type),
+      'temperatureCelsius': temperatureCelsius,
+      'windSpeed': windSpeed,
+      'rainIntensity': rainIntensity,
+      'updatedAt': updatedAt,
+    };
+  }
+
+  @override
+  bool operator ==(Object other) {
+    return other is WeatherState &&
+        other.type == type &&
+        other.temperatureCelsius == temperatureCelsius &&
+        other.windSpeed == windSpeed &&
+        other.rainIntensity == rainIntensity &&
+        other.updatedAt == updatedAt;
+  }
+
+  @override
+  int get hashCode => Object.hash(
+        type,
+        temperatureCelsius,
+        windSpeed,
+        rainIntensity,
+        updatedAt,
+      );
+}
+
+WeatherType _weatherTypeFromJson(String? value) {
+  switch (value) {
+    case 'sunny':
+      return WeatherType.sunny;
+    case 'cloudy':
+      return WeatherType.cloudy;
+    case 'rainy':
+      return WeatherType.rainy;
+    case 'stormy':
+      return WeatherType.stormy;
+    case 'snowy':
+      return WeatherType.snowy;
+    case 'foggy':
+      return WeatherType.foggy;
+    case 'windy':
+      return WeatherType.windy;
+    case 'night_clear':
+      return WeatherType.nightClear;
+    default:
+      return WeatherType.sunny;
+  }
+}
+
+String _weatherTypeToJson(WeatherType type) {
+  switch (type) {
+    case WeatherType.sunny:
+      return 'sunny';
+    case WeatherType.cloudy:
+      return 'cloudy';
+    case WeatherType.rainy:
+      return 'rainy';
+    case WeatherType.stormy:
+      return 'stormy';
+    case WeatherType.snowy:
+      return 'snowy';
+    case WeatherType.foggy:
+      return 'foggy';
+    case WeatherType.windy:
+      return 'windy';
+    case WeatherType.nightClear:
+      return 'night_clear';
+  }
 }

@@ -1,16 +1,17 @@
 import 'dart:async';
 
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hive_flutter/hive_flutter.dart';
-import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import 'package:tangping_lobster/models/weather.dart';
 import 'package:tangping_lobster/providers/api_providers.dart';
 import 'package:tangping_lobster/services/ws_service.dart';
 
-part 'weather_provider.g.dart';
-
 const _hiveBoxName = 'weather';
 const _hiveCacheKey = 'latest_weather';
+
+/// Parameter record for [WeatherNotifier].
+typedef WeatherArg = ({double lat, double lon});
 
 /// Manages current weather and its effect on the lobster.
 ///
@@ -18,23 +19,20 @@ const _hiveCacheKey = 'latest_weather';
 /// - Caches the response in Hive for offline use.
 /// - Auto-refreshes on [WsWeatherEvent].
 /// - Manual refresh via [refresh].
-@riverpod
-class WeatherNotifier extends _$WeatherNotifier {
+class WeatherNotifier
+    extends FamilyAsyncNotifier<WeatherResponse, WeatherArg> {
   late final Box<Map<dynamic, dynamic>> _box;
   StreamSubscription<WsEvent>? _wsSub;
 
   @override
-  Future<WeatherResponse> build({
-    required double lat,
-    required double lon,
-  }) async {
+  Future<WeatherResponse> build(WeatherArg params) async {
     _box = await Hive.openBox<Map<dynamic, dynamic>>(_hiveBoxName);
 
     final ws = ref.watch(webSocketServiceProvider);
     _wsSub = ws.events.listen(_handleWsEvent);
     ref.onDispose(() => _wsSub?.cancel());
 
-    return _fetchAndCache(lat: lat, lon: lon);
+    return _fetchAndCache(lat: params.lat, lon: params.lon);
   }
 
   // -------------------------------------------------------------------------
@@ -45,7 +43,10 @@ class WeatherNotifier extends _$WeatherNotifier {
   Future<void> refresh({double? lat, double? lon}) async {
     state = const AsyncLoading();
     state = await AsyncValue.guard(
-      () => _fetchAndCache(lat: lat ?? this.lat, lon: lon ?? this.lon),
+      () => _fetchAndCache(
+        lat: lat ?? arg.lat,
+        lon: lon ?? arg.lon,
+      ),
     );
   }
 
@@ -102,3 +103,9 @@ class WeatherNotifier extends _$WeatherNotifier {
     }
   }
 }
+
+/// Family provider for [WeatherNotifier] parameterised by lat/lon record.
+final weatherNotifierProvider =
+    AsyncNotifierProviderFamily<WeatherNotifier, WeatherResponse, WeatherArg>(
+  WeatherNotifier.new,
+);

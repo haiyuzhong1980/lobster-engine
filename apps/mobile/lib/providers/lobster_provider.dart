@@ -1,24 +1,21 @@
 import 'dart:async';
 
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hive_flutter/hive_flutter.dart';
-import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import 'package:tangping_lobster/models/lobster_state.dart';
 import 'package:tangping_lobster/providers/api_providers.dart';
 import 'package:tangping_lobster/services/ws_service.dart';
 
-part 'lobster_provider.g.dart';
-
 const _hiveBoxName = 'lobster_state';
 const _hiveKeyPrefix = 'lobster_';
 
-/// Manages the full [LobsterState] for a single lobster identified by [id].
+/// Manages the full [LobsterState] for a single lobster identified by [arg].
 ///
 /// - Fetches from API on first build.
 /// - Caches the latest state in Hive for offline use.
 /// - Auto-refreshes whenever a [WsLobsterUpdateEvent] arrives for this lobster.
-@riverpod
-class LobsterNotifier extends _$LobsterNotifier {
+class LobsterNotifier extends FamilyAsyncNotifier<LobsterState, String> {
   late final Box<Map<dynamic, dynamic>> _box;
   StreamSubscription<WsEvent>? _wsSub;
 
@@ -41,7 +38,7 @@ class LobsterNotifier extends _$LobsterNotifier {
   /// Re-fetch the lobster state from the server, then cache it.
   Future<void> refresh() async {
     state = const AsyncLoading();
-    state = await AsyncValue.guard(() => _fetchAndCache(id));
+    state = await AsyncValue.guard(() => _fetchAndCache(arg));
   }
 
   // -------------------------------------------------------------------------
@@ -81,7 +78,7 @@ class LobsterNotifier extends _$LobsterNotifier {
 
   void _handleWsEvent(WsEvent event) {
     if (event is! WsLobsterUpdateEvent) return;
-    if (event.lobsterId != id) return;
+    if (event.lobsterId != arg) return;
 
     // Merge server patch into the current state.
     final current = state.valueOrNull;
@@ -99,15 +96,19 @@ class LobsterNotifier extends _$LobsterNotifier {
   }
 }
 
+/// Family provider for [LobsterNotifier].
+final lobsterNotifierProvider =
+    AsyncNotifierProviderFamily<LobsterNotifier, LobsterState, String>(
+  LobsterNotifier.new,
+);
+
 /// Convenience provider that registers a new lobster and returns its state.
 ///
 /// This is a one-shot [FutureProvider] — call it from UI with `ref.read`.
-@riverpod
-Future<LobsterState> registerLobster(
-  RegisterLobsterRef ref, {
-  required String name,
-  required String ownerId,
-}) async {
-  final api = ref.read(apiServiceProvider);
-  return api.registerLobster(name, ownerId);
-}
+final registerLobsterProvider = FutureProvider.autoDispose
+    .family<LobsterState, ({String name, String ownerId})>(
+  (ref, params) async {
+    final api = ref.read(apiServiceProvider);
+    return api.registerLobster(params.name, params.ownerId);
+  },
+);

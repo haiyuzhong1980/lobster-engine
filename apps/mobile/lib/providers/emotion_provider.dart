@@ -1,24 +1,21 @@
 import 'dart:async';
 
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hive_flutter/hive_flutter.dart';
-import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import 'package:tangping_lobster/models/emotion_state.dart';
 import 'package:tangping_lobster/providers/api_providers.dart';
 import 'package:tangping_lobster/services/ws_service.dart';
 
-part 'emotion_provider.g.dart';
-
 const _hiveBoxName = 'emotion_state';
 const _hiveKeyPrefix = 'emotion_';
 
-/// Manages the [EmotionState] for a single lobster identified by [lobsterId].
+/// Manages the [EmotionState] for a single lobster identified by [arg].
 ///
 /// - Derives initial state from the lobster state endpoint.
 /// - Listens for [WsLobsterUpdateEvent] to refresh emotion in real time.
 /// - Exposes [triggerEmotion] to programmatically change the emotion.
-@riverpod
-class EmotionNotifier extends _$EmotionNotifier {
+class EmotionNotifier extends FamilyAsyncNotifier<EmotionState, String> {
   late final Box<Map<dynamic, dynamic>> _box;
   StreamSubscription<WsEvent>? _wsSub;
 
@@ -40,7 +37,7 @@ class EmotionNotifier extends _$EmotionNotifier {
   /// Trigger an emotion change on the server and update local state.
   Future<void> triggerEmotion(String trigger) async {
     final api = ref.read(apiServiceProvider);
-    final updated = await api.triggerEmotion(lobsterId, trigger);
+    final updated = await api.triggerEmotion(arg, trigger);
     state = AsyncData(updated);
     await _cache(updated);
   }
@@ -48,7 +45,7 @@ class EmotionNotifier extends _$EmotionNotifier {
   /// Re-fetch the emotion from the lobster state endpoint.
   Future<void> refresh() async {
     state = const AsyncLoading();
-    state = await AsyncValue.guard(() => _fetchAndCache(lobsterId));
+    state = await AsyncValue.guard(() => _fetchAndCache(arg));
   }
 
   // -------------------------------------------------------------------------
@@ -72,7 +69,7 @@ class EmotionNotifier extends _$EmotionNotifier {
 
   Future<void> _cache(EmotionState emotion) async {
     await _box.put(
-      '$_hiveKeyPrefix$lobsterId',
+      '$_hiveKeyPrefix$arg',
       Map<String, Object?>.from(emotion.toJson()),
     );
   }
@@ -89,7 +86,7 @@ class EmotionNotifier extends _$EmotionNotifier {
 
   void _handleWsEvent(WsEvent event) {
     if (event is! WsLobsterUpdateEvent) return;
-    if (event.lobsterId != lobsterId) return;
+    if (event.lobsterId != arg) return;
 
     final emotionPayload = event.payload['emotion'];
     if (emotionPayload is! Map<String, Object?>) return;
@@ -108,3 +105,9 @@ class EmotionNotifier extends _$EmotionNotifier {
     }
   }
 }
+
+/// Family provider for [EmotionNotifier].
+final emotionNotifierProvider =
+    AsyncNotifierProviderFamily<EmotionNotifier, EmotionState, String>(
+  EmotionNotifier.new,
+);
