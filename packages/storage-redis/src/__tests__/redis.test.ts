@@ -1,7 +1,7 @@
 // @lobster-engine/storage-redis — RedisProvider unit tests
 // All ioredis interactions are fully mocked; no real Redis connection is made.
 
-import { describe, it, expect, beforeEach, vi, type MockInstance } from 'vitest';
+import { describe, it, expect, vi, beforeEach, type MockInstance } from 'vitest';
 import { RedisProvider } from '../index.js';
 
 // ---------------------------------------------------------------------------
@@ -54,15 +54,6 @@ vi.mock('ioredis', () => {
   const RedisMock = vi.fn().mockImplementation(() => fakeClient);
   return { default: RedisMock };
 });
-
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
-
-function connectedProvider(config?: ConstructorParameters<typeof RedisProvider>[0]): RedisProvider {
-  // We call connect() synchronously via the mock — use this in async helpers.
-  return new RedisProvider(config);
-}
 
 // ---------------------------------------------------------------------------
 // Tests

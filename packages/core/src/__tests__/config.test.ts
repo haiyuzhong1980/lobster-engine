@@ -1,6 +1,6 @@
 // @lobster-engine/core — ConfigManager tests
 
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { ConfigManager, EnvConfigSource, FileConfigSource, DefaultConfigSource } from '../config.js';
 import { writeFileSync, unlinkSync } from 'node:fs';
 import { join } from 'node:path';
@@ -13,7 +13,7 @@ describe('ConfigManager', () => {
 
   describe('source priority', () => {
     it('env source overrides file and default', () => {
-      const env = new EnvConfigSource();
+      const _env = new EnvConfigSource();
       const file = new DefaultConfigSource({ MY_KEY: 'from-file' });
       const defaults = new DefaultConfigSource({ MY_KEY: 'from-default' });
 

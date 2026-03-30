@@ -197,10 +197,9 @@ describe('Integration: LobsterEngine + WerewolfPlugin — engine lifecycle', () 
 
 describe('Integration: LobsterEngine + WerewolfPlugin — event emission', () => {
   let engine: LobsterEngine;
-  let adapter: WerewolfMockAdapter;
 
   beforeEach(async () => {
-    ({ engine, adapter } = buildEngine(['nothing']));
+    ({ engine } = buildEngine(['nothing']));
     await engine.start();
   });
 
@@ -253,11 +252,7 @@ describe('Integration: LobsterEngine + WerewolfPlugin — event emission', () =>
 
     await engine.handleTurnEvent(makeTurnEvent('night_witch'));
 
-    const [_botId, _sceneId, result] = actionHandler.mock.calls[0] as [
-      string,
-      string,
-      ActionResult,
-    ];
+    const result = (actionHandler.mock.calls[0] as [string, string, ActionResult])[2];
     expect(result).toBeDefined();
     expect(typeof result.duration).toBe('number');
   });

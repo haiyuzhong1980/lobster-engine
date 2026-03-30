@@ -2,7 +2,6 @@
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { SSEManager, createSSEHandler } from '../sse.js';
-import type { SSEClient } from '../sse.js';
 import type { EngineEvent } from '@lobster-engine/core';
 import { Hono } from 'hono';
 
@@ -45,12 +44,6 @@ function makeController(): {
       return chunks.map((c) => decoder.decode(c)).join('');
     },
   };
-}
-
-/** Decode all enqueued bytes to a string. */
-function chunkText(chunks: Uint8Array[]): string {
-  const decoder = new TextDecoder();
-  return chunks.map((c) => decoder.decode(c)).join('');
 }
 
 const SCENE_A = 'scene-a';

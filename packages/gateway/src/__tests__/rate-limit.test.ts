@@ -32,14 +32,6 @@ async function get(
   return app.request(path, { method: 'GET', headers });
 }
 
-async function post(
-  app: Hono,
-  path: string,
-  headers: Record<string, string> = {},
-): Promise<Response> {
-  return app.request(path, { method: 'POST', headers });
-}
-
 // ---------------------------------------------------------------------------
 // Health endpoint bypass
 // ---------------------------------------------------------------------------

@@ -3,10 +3,10 @@
 import type {
   ScenePlugin,
   SceneContext,
-  ActionValidationResult,
   ChatMessage,
   TurnEvent,
   ActionSpec,
+  ActionValidationResult,
 } from '@lobster-engine/core';
 
 // ---------------------------------------------------------------------------

@@ -1,6 +1,6 @@
 // @lobster-engine/gateway — MetricsRegistry unit tests
 
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, afterEach } from 'vitest';
 import { Registry } from 'prom-client';
 import { Hono } from 'hono';
 import { MetricsRegistry, createMetricsMiddleware, createMetricsHandler } from '../metrics.js';

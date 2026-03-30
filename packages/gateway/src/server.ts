@@ -108,9 +108,6 @@ const MAX_BODY_SIZE = 1024 * 1024; // 1 MB
 // Input validation helpers
 // ---------------------------------------------------------------------------
 
-/** Allowed pattern for ID fields: alphanumeric, underscore, hyphen, colon. */
-const ID_PATTERN = /^[\w\-:]+$/;
-
 /**
  * Validate a string field that represents a short label (platform, sceneType,
  * sceneName, botId, sceneId, actionType).  Returns an error message on
@@ -119,19 +116,6 @@ const ID_PATTERN = /^[\w\-:]+$/;
 function validateShortString(value: string, fieldName: string, maxLen = 128): string | null {
   if (value.length === 0) return `${fieldName} must not be empty`;
   if (value.length > maxLen) return `${fieldName} exceeds maximum length of ${maxLen}`;
-  return null;
-}
-
-/**
- * Validate an ID field (botId, sceneId): alphanumeric + underscore + hyphen +
- * colon, max 128 chars.
- */
-function validateId(value: string, fieldName: string): string | null {
-  const lenErr = validateShortString(value, fieldName, 128);
-  if (lenErr !== null) return lenErr;
-  if (!ID_PATTERN.test(value)) {
-    return `${fieldName} may only contain letters, digits, underscores, hyphens, and colons`;
-  }
   return null;
 }
 

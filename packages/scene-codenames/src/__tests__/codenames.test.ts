@@ -2,8 +2,8 @@
 
 import { describe, it, expect } from 'vitest';
 import { CodenamesPlugin } from '../index.js';
-import type { CodenamesState, BoardCard, GamePhase } from '../index.js';
-import type { SceneContext, ActionValidationResult } from '@lobster-engine/core';
+import type { CodenamesState, BoardCard } from '../index.js';
+import type { SceneContext } from '@lobster-engine/core';
 import type { TurnEvent, ActionSpec } from '@lobster-engine/core';
 
 // ---------------------------------------------------------------------------
@@ -236,8 +236,6 @@ describe('CodenamesPlugin.buildPrompt()', () => {
   });
 
   it('uses event phase over state phase', () => {
-    const state = makeState({ phase: 'spymaster_clue', role: 'guesser' });
-    const ctx = makeContext(state);
     const event = makeTurnEvent({
       phase: 'team_guess',
       data: {},

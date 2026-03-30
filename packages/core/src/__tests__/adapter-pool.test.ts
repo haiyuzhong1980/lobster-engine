@@ -1,9 +1,8 @@
 // @lobster-engine/core — AdapterPool comprehensive tests
 
-import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import {
   AdapterPool,
-  AdapterPoolCircuitOpenError,
   AdapterPoolNoAdaptersError,
   AdapterPoolQueueFullError,
   AdapterPoolQueueTimeoutError,
@@ -262,7 +261,7 @@ describe('AdapterPool', () => {
       await flushPromises();
 
       const stats = pool.getStats();
-      const busyStat = stats.find((s) => s.name === 'busy')!;
+      const _busyStat = stats.find((s) => s.name === 'busy')!;
       const freeStat = stats.find((s) => s.name === 'free')!;
 
       // Free adapter should have picked up at least one request

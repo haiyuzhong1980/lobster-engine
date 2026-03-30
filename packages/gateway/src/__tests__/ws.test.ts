@@ -332,7 +332,7 @@ describe('WSManager — inbound message handling', () => {
 
   it('processes subscribe message from client', async () => {
     const ws = new MockWebSocket();
-    const id = await addMockClient(manager, ws);
+    const _id = await addMockClient(manager, ws);
     ws.sent.length = 0;
 
     ws.simulateMessage({ type: 'subscribe', sceneId: 'scene-msg' });

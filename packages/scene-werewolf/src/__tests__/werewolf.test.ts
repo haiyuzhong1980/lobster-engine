@@ -2,8 +2,8 @@
 
 import { describe, it, expect } from 'vitest';
 import { WerewolfPlugin } from '../index.js';
-import type { WerewolfState, GamePhase } from '../index.js';
-import type { SceneContext, ActionValidationResult } from '@lobster-engine/core';
+import type { WerewolfState } from '../index.js';
+import type { SceneContext } from '@lobster-engine/core';
 import type { TurnEvent, ActionSpec } from '@lobster-engine/core';
 
 // ---------------------------------------------------------------------------

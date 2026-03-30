@@ -118,7 +118,7 @@ function makePushSub(messages: MockJsMsg[] = []) {
 // A pull subscription that collects fetch() calls.
 function makePullSub(batches: MockJsMsg[][] = []) {
   const allMessages = batches.flat();
-  let callCount = 0;
+  let _callCount = 0;
 
   const sub = {
     unsubscribe: vi.fn(),
@@ -130,7 +130,7 @@ function makePullSub(batches: MockJsMsg[][] = []) {
           if (idx < allMessages.length) {
             return Promise.resolve({ value: allMessages[idx++] as MockJsMsg, done: false });
           }
-          callCount++;
+          _callCount++;
           return new Promise(() => {
             // Never resolves — simulates timeout
           });
