@@ -18,14 +18,16 @@ import type { SceneContext, TurnEvent, ActionSpec } from '@lobster-engine/core';
 // Test fixtures
 // ---------------------------------------------------------------------------
 
+// Fixtures use the canonical -100..+100 scale from @lobster-engine/core.
+// Balanced/neutral value is 0 (was 0.5 on the old 0-1 scale).
 function makePersonality(overrides: Partial<PersonalityDNA> = {}): PersonalityDNA {
   return {
-    introversion_extroversion: 0.5,
-    laziness_curiosity: 0.5,
-    emotional_rational: 0.5,
-    talkative_silent: 0.5,
-    foodie_ascetic: 0.5,
-    nightowl_earlybird: 0.5,
+    introversion_extroversion: 0,
+    laziness_curiosity: 0,
+    emotional_rational: 0,
+    talkative_silent: 0,
+    foodie_ascetic: 0,
+    nightowl_earlybird: 0,
     ...overrides,
   };
 }
@@ -374,37 +376,41 @@ describe('DiaryBuilder.activityToLobsterDescription()', () => {
 
 describe('DiaryBuilder.getQuoteStyle()', () => {
   it('returns "silent" for a very silent personality', () => {
-    const personality = makePersonality({ talkative_silent: 0 });
+    // talkative_silent: -100 = maximally silent (low end of -100..+100)
+    const personality = makePersonality({ talkative_silent: -100 });
     expect(DiaryBuilder.getQuoteStyle(personality)).toBe('silent');
   });
 
   it('returns "foodie" for a max-foodie personality', () => {
+    // foodie_ascetic: 100 = max foodie; other traits near zero
     const personality = makePersonality({
-      foodie_ascetic: 1,
-      talkative_silent: 0.5,
-      introversion_extroversion: 0.3,
-      laziness_curiosity: 0.3,
-      emotional_rational: 0.3,
+      foodie_ascetic: 100,
+      talkative_silent: 0,
+      introversion_extroversion: -40,
+      laziness_curiosity: -40,
+      emotional_rational: -40,
     });
     expect(DiaryBuilder.getQuoteStyle(personality)).toBe('foodie');
   });
 
   it('returns "social" for a max-extrovert personality', () => {
+    // introversion_extroversion: 100 = max extrovert
     const personality = makePersonality({
-      introversion_extroversion: 1,
-      foodie_ascetic: 0.3,
-      talkative_silent: 0.5,
-      laziness_curiosity: 0.3,
+      introversion_extroversion: 100,
+      foodie_ascetic: -40,
+      talkative_silent: 0,
+      laziness_curiosity: -40,
     });
     expect(DiaryBuilder.getQuoteStyle(personality)).toBe('social');
   });
 
   it('returns "curious" for a max-curious personality', () => {
+    // laziness_curiosity: 100 = max curious
     const personality = makePersonality({
-      laziness_curiosity: 1,
-      foodie_ascetic: 0.3,
-      introversion_extroversion: 0.3,
-      talkative_silent: 0.5,
+      laziness_curiosity: 100,
+      foodie_ascetic: -40,
+      introversion_extroversion: -40,
+      talkative_silent: 0,
     });
     expect(DiaryBuilder.getQuoteStyle(personality)).toBe('curious');
   });
@@ -502,8 +508,9 @@ describe('DiaryPlugin.buildPrompt()', () => {
   });
 
   it('system message includes personality context (persona description)', () => {
+    // talkative_silent: -100 = maximally silent on -100..+100 scale
     const input = makeDiaryInput({
-      personality: makePersonality({ talkative_silent: 0 }),
+      personality: makePersonality({ talkative_silent: -100 }),
     });
     const [system] = plugin.buildPrompt(makeTurnEvent(input), makeContext());
     // Silent persona should appear
@@ -513,10 +520,10 @@ describe('DiaryPlugin.buildPrompt()', () => {
   it('system message includes foodie style for foodie personality', () => {
     const input = makeDiaryInput({
       personality: makePersonality({
-        foodie_ascetic: 1,
-        talkative_silent: 0.5,
-        introversion_extroversion: 0.2,
-        laziness_curiosity: 0.2,
+        foodie_ascetic: 100,
+        talkative_silent: 0,
+        introversion_extroversion: -60,
+        laziness_curiosity: -60,
       }),
     });
     const [system] = plugin.buildPrompt(makeTurnEvent(input), makeContext());
@@ -536,8 +543,9 @@ describe('DiaryPlugin.buildPrompt()', () => {
   });
 
   it('system message includes style writing requirements', () => {
+    // laziness_curiosity: 100 = max curious; foodie_ascetic: -100 = min foodie (ascetic)
     const input = makeDiaryInput({
-      personality: makePersonality({ laziness_curiosity: 1, foodie_ascetic: 0 }),
+      personality: makePersonality({ laziness_curiosity: 100, foodie_ascetic: -100 }),
     });
     const [system] = plugin.buildPrompt(makeTurnEvent(input), makeContext());
     // Curious style guide mentions 为什么 or 好奇

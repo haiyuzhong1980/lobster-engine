@@ -8,22 +8,16 @@ import type {
   ChatMessage,
   TurnEvent,
   ActionSpec,
+  PersonalityDNA,
 } from '@lobster-engine/core';
+
+export type { PersonalityDNA } from '@lobster-engine/core';
 
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
 
 export type ArenaMode = 'debate' | 'lying_flat' | 'counting';
-
-export interface PersonalityDNA {
-  readonly introversion_extroversion: number; // -1.0 introverted … +1.0 extroverted
-  readonly laziness_curiosity: number;         // -1.0 lazy … +1.0 curious
-  readonly emotional_rational: number;         // -1.0 emotional … +1.0 rational
-  readonly talkative_silent: number;           // -1.0 silent … +1.0 talkative
-  readonly foodie_ascetic: number;             // -1.0 ascetic … +1.0 foodie
-  readonly nightowl_earlybird: number;         // -1.0 early bird … +1.0 night owl
-}
 
 export interface ArenaRewardResult {
   readonly lazyCoin: number;
@@ -109,7 +103,7 @@ export class TopicPicker {
     }
 
     // If all scores are too close to zero, fall back to random
-    if (Math.abs(best.score) < 0.05) {
+    if (Math.abs(best.score) < 5) {
       return TopicPicker.pickRandom();
     }
 
@@ -226,7 +220,7 @@ function dominantStyle(dna: PersonalityDNA): PersonalityStyle {
 
   let best: { style: PersonalityStyle; score: number } = {
     style: 'default',
-    score: 0.3, // threshold: only override when score is clearly dominant
+    score: 30, // threshold: only override when score is clearly dominant (-100..+100 scale)
   };
 
   for (const c of candidates) {

@@ -17,67 +17,70 @@ import type { SceneContext, TurnEvent, ActionSpec } from '@lobster-engine/core';
 // Fixtures
 // ---------------------------------------------------------------------------
 
+// Fixtures use the canonical -100..+100 scale from @lobster-engine/core.
+// Conversion from original 0-1 scale: newVal = (oldVal - 0.5) * 200
+
 const EXTROVERT: PersonalityDNA = {
-  introversion_extroversion: 0.9,
-  laziness_curiosity: 0.5,
-  emotional_rational: 0.5,
-  talkative_silent: 0.1,
-  foodie_ascetic: 0.5,
-  nightowl_earlybird: 0.5,
+  introversion_extroversion: 80,   // was 0.9
+  laziness_curiosity: 0,            // was 0.5
+  emotional_rational: 0,            // was 0.5
+  talkative_silent: -80,            // was 0.1
+  foodie_ascetic: 0,                // was 0.5
+  nightowl_earlybird: 0,            // was 0.5
 };
 
 const INTROVERT: PersonalityDNA = {
-  introversion_extroversion: 0.1,
-  laziness_curiosity: 0.5,
-  emotional_rational: 0.5,
-  talkative_silent: 0.9,
-  foodie_ascetic: 0.5,
-  nightowl_earlybird: 0.5,
+  introversion_extroversion: -80,   // was 0.1
+  laziness_curiosity: 0,            // was 0.5
+  emotional_rational: 0,            // was 0.5
+  talkative_silent: 80,             // was 0.9
+  foodie_ascetic: 0,                // was 0.5
+  nightowl_earlybird: 0,            // was 0.5
 };
 
 const FOODIE: PersonalityDNA = {
-  introversion_extroversion: 0.5,
-  laziness_curiosity: 0.5,
-  emotional_rational: 0.3,
-  talkative_silent: 0.3,
-  foodie_ascetic: 0.05,
-  nightowl_earlybird: 0.5,
+  introversion_extroversion: 0,     // was 0.5
+  laziness_curiosity: 0,            // was 0.5
+  emotional_rational: -40,          // was 0.3
+  talkative_silent: -40,            // was 0.3
+  foodie_ascetic: -90,              // was 0.05
+  nightowl_earlybird: 0,            // was 0.5
 };
 
 const NIGHT_OWL: PersonalityDNA = {
-  introversion_extroversion: 0.5,
-  laziness_curiosity: 0.7,
-  emotional_rational: 0.5,
-  talkative_silent: 0.4,
-  foodie_ascetic: 0.5,
-  nightowl_earlybird: 0.05,
+  introversion_extroversion: 0,     // was 0.5
+  laziness_curiosity: 40,           // was 0.7
+  emotional_rational: 0,            // was 0.5
+  talkative_silent: -20,            // was 0.4
+  foodie_ascetic: 0,                // was 0.5
+  nightowl_earlybird: -90,          // was 0.05
 };
 
 const CURIOUS: PersonalityDNA = {
-  introversion_extroversion: 0.5,
-  laziness_curiosity: 0.9,
-  emotional_rational: 0.6,
-  talkative_silent: 0.3,
-  foodie_ascetic: 0.5,
-  nightowl_earlybird: 0.5,
+  introversion_extroversion: 0,     // was 0.5
+  laziness_curiosity: 80,           // was 0.9
+  emotional_rational: 20,           // was 0.6
+  talkative_silent: -40,            // was 0.3
+  foodie_ascetic: 0,                // was 0.5
+  nightowl_earlybird: 0,            // was 0.5
 };
 
 const BALANCED: PersonalityDNA = {
-  introversion_extroversion: 0.5,
-  laziness_curiosity: 0.5,
-  emotional_rational: 0.5,
-  talkative_silent: 0.5,
-  foodie_ascetic: 0.5,
-  nightowl_earlybird: 0.5,
+  introversion_extroversion: 0,     // was 0.5
+  laziness_curiosity: 0,            // was 0.5
+  emotional_rational: 0,            // was 0.5
+  talkative_silent: 0,              // was 0.5
+  foodie_ascetic: 0,                // was 0.5
+  nightowl_earlybird: 0,            // was 0.5
 };
 
 const PHILOSOPHER: PersonalityDNA = {
-  introversion_extroversion: 0.2,
-  laziness_curiosity: 0.8,
-  emotional_rational: 0.8,
-  talkative_silent: 0.6,
-  foodie_ascetic: 0.8,
-  nightowl_earlybird: 0.3,
+  introversion_extroversion: -60,   // was 0.2
+  laziness_curiosity: 60,           // was 0.8
+  emotional_rational: 60,           // was 0.8
+  talkative_silent: 20,             // was 0.6
+  foodie_ascetic: 60,               // was 0.8
+  nightowl_earlybird: -40,          // was 0.3
 };
 
 function makePersonality(overrides: Partial<PersonalityDNA> = {}): PersonalityDNA {
@@ -317,25 +320,27 @@ describe('DialogueHelper.buildPersonalityPrompt()', () => {
   });
 
   it('describes silent traits for high talkative_silent', () => {
-    const silent = makePersonality({ talkative_silent: 0.95 });
+    // 90 = dominant silent on -100..+100 scale
+    const silent = makePersonality({ talkative_silent: 90 });
     const result = DialogueHelper.buildPersonalityPrompt(silent);
     expect(result).toContain('惜字如金');
   });
 
   it('describes talkative traits for low talkative_silent', () => {
-    const talkative = makePersonality({ talkative_silent: 0.05 });
+    // -90 = recessive (very talkative) on -100..+100 scale
+    const talkative = makePersonality({ talkative_silent: -90 });
     const result = DialogueHelper.buildPersonalityPrompt(talkative);
     expect(result).toContain('话特别多');
   });
 
-  it('does not throw for extreme edge-case values (0 and 1)', () => {
+  it('does not throw for extreme edge-case values (-100 and 100)', () => {
     const extreme: PersonalityDNA = {
-      introversion_extroversion: 1,
-      laziness_curiosity: 1,
-      emotional_rational: 1,
-      talkative_silent: 1,
-      foodie_ascetic: 1,
-      nightowl_earlybird: 1,
+      introversion_extroversion: 100,
+      laziness_curiosity: 100,
+      emotional_rational: 100,
+      talkative_silent: 100,
+      foodie_ascetic: 100,
+      nightowl_earlybird: 100,
     };
     expect(() => DialogueHelper.buildPersonalityPrompt(extreme)).not.toThrow();
   });

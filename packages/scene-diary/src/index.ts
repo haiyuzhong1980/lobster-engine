@@ -7,10 +7,13 @@ import type {
   TurnEvent,
   ActionSpec,
   ActionValidationResult,
+  PersonalityDNA,
 } from '@lobster-engine/core';
 
+export type { PersonalityDNA } from '@lobster-engine/core';
+
 // ---------------------------------------------------------------------------
-// Local types (will be imported from core when lobster-types is ready)
+// Local types
 // ---------------------------------------------------------------------------
 
 export type ActivityType =
@@ -39,15 +42,6 @@ export type EmotionType =
   | 'proud'
   | 'surprised'
   | 'zen';
-
-export interface PersonalityDNA {
-  readonly introversion_extroversion: number;  // 0 = full introvert, 1 = full extrovert
-  readonly laziness_curiosity: number;          // 0 = max lazy, 1 = max curious
-  readonly emotional_rational: number;          // 0 = pure emotion, 1 = pure rational
-  readonly talkative_silent: number;            // 0 = silent, 1 = very talkative
-  readonly foodie_ascetic: number;              // 0 = ascetic, 1 = total foodie
-  readonly nightowl_earlybird: number;          // 0 = early bird, 1 = night owl
-}
 
 export interface ActivityEntry {
   readonly time: string;     // HH:MM
@@ -215,14 +209,23 @@ export class DiaryBuilder {
   static getQuoteStyle(
     personality: PersonalityDNA,
   ): 'philosophical' | 'foodie' | 'silent' | 'social' | 'curious' {
+    // Normalize each trait from -100..+100 to 0..1 for score calculations
+    const norm = (v: number): number => (v + 100) / 200;
+
+    const emotional_rational = norm(personality.emotional_rational);
+    const talkative_silent = norm(personality.talkative_silent);
+    const foodie_ascetic = norm(personality.foodie_ascetic);
+    const introversion_extroversion = norm(personality.introversion_extroversion);
+    const laziness_curiosity = norm(personality.laziness_curiosity);
+
     const scores: Readonly<
       Record<'philosophical' | 'foodie' | 'silent' | 'social' | 'curious', number>
     > = {
-      philosophical: personality.emotional_rational * (1 - personality.talkative_silent),
-      foodie: personality.foodie_ascetic,
-      silent: 1 - personality.talkative_silent,
-      social: personality.introversion_extroversion,
-      curious: personality.laziness_curiosity,
+      philosophical: emotional_rational * (1 - talkative_silent),
+      foodie: foodie_ascetic,
+      silent: 1 - talkative_silent,
+      social: introversion_extroversion,
+      curious: laziness_curiosity,
     };
 
     // Return the style with the highest score; philosophical wins ties

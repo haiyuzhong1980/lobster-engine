@@ -292,6 +292,9 @@ export class GatewayServer {
   /** Per-server Prometheus registry — isolated so test instances don't clash. */
   readonly metrics: MetricsRegistry;
 
+  /** Periodic timer that prunes stale encounter reports from EncounterMatcher. */
+  private encounterCleanupTimer?: ReturnType<typeof setInterval>;
+
   /** True when NATS is configured and enabled via config.useNats. */
   private get natsEnabled(): boolean {
     return this.config.useNats === true && this.config.nats !== undefined;
@@ -1003,8 +1006,8 @@ export class GatewayServer {
         return c.json<ApiResponse<never>>(fail(giftTypeErr), 400);
       }
 
-      if (!Number.isFinite(cost) || cost < 0) {
-        return c.json<ApiResponse<never>>(fail('cost must be a non-negative number'), 400);
+      if (!Number.isFinite(cost) || cost <= 0) {
+        return c.json<ApiResponse<never>>(fail('cost must be a positive number'), 400);
       }
 
       if (senderId === receiverId) {
@@ -1295,12 +1298,18 @@ export class GatewayServer {
         ? meta['altitude']
         : undefined;
 
+      const now = Date.now();
+      const lastActivity = this.lobsterActivities.get(lobsterId);
+      const durationMinutes = lastActivity
+        ? Math.floor((now - lastActivity.timestamp) / 60_000)
+        : 0;
+
       const activityRecord: LobsterActivityRecord = {
         lobsterId,
         type: activityType,
         confidence: rawConfidence,
         metadata: { speed, steps, altitude },
-        timestamp: Date.now(),
+        timestamp: now,
       };
 
       this.lobsterActivities.set(lobsterId, activityRecord);
@@ -1313,14 +1322,13 @@ export class GatewayServer {
           ...existing,
           currentActivity: activityType,
           currentScene: behavior.scene,
-          updatedAt: Date.now(),
+          updatedAt: now,
         };
         this.lobsters.set(lobsterId, updated);
       }
 
       // Calculate behavior and incentive
       const behavior = LifePulsePlugin.getBehavior(activityType);
-      const durationMinutes = 0; // no duration context at this point; use 0
       const incentive = LifePulsePlugin.calculateIncentive(activityType, durationMinutes, {
         steps,
         timestamp: activityRecord.timestamp,
@@ -1501,6 +1509,10 @@ export class GatewayServer {
   // --------------------------------------------------------------------------
 
   async start(): Promise<void> {
+    this.encounterCleanupTimer = setInterval(
+      () => this.encounterMatcher.cleanup(),
+      60_000,
+    );
     return new Promise((resolve) => {
       this.server = serve(
         {
@@ -1516,6 +1528,8 @@ export class GatewayServer {
   }
 
   async stop(): Promise<void> {
+    clearInterval(this.encounterCleanupTimer);
+    this.encounterCleanupTimer = undefined;
     return new Promise((resolve, reject) => {
       if (this.server === undefined) {
         resolve();

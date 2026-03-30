@@ -65,39 +65,39 @@ function makeTurnEvent(
 }
 
 const foodieDNA: PersonalityDNA = {
-  introversion_extroversion: 0.2,
-  laziness_curiosity: 0.0,
-  emotional_rational: 0.0,
-  talkative_silent: 0.5,
-  foodie_ascetic: 0.9,
-  nightowl_earlybird: 0.1,
+  introversion_extroversion: 20,
+  laziness_curiosity: 0,
+  emotional_rational: 0,
+  talkative_silent: 50,
+  foodie_ascetic: 90,
+  nightowl_earlybird: 10,
 };
 
 const silentDNA: PersonalityDNA = {
-  introversion_extroversion: -0.8,
-  laziness_curiosity: 0.0,
-  emotional_rational: 0.5,
-  talkative_silent: -0.9,
-  foodie_ascetic: 0.0,
-  nightowl_earlybird: 0.0,
+  introversion_extroversion: -80,
+  laziness_curiosity: 0,
+  emotional_rational: 50,
+  talkative_silent: -90,
+  foodie_ascetic: 0,
+  nightowl_earlybird: 0,
 };
 
 const philosopherDNA: PersonalityDNA = {
-  introversion_extroversion: -0.3,
-  laziness_curiosity: -0.85,
-  emotional_rational: 0.6,
-  talkative_silent: 0.2,
-  foodie_ascetic: -0.2,
-  nightowl_earlybird: 0.3,
+  introversion_extroversion: -30,
+  laziness_curiosity: -85,
+  emotional_rational: 60,
+  talkative_silent: 20,
+  foodie_ascetic: -20,
+  nightowl_earlybird: 30,
 };
 
 const socialDNA: PersonalityDNA = {
-  introversion_extroversion: 0.9,
-  laziness_curiosity: 0.4,
-  emotional_rational: -0.2,
-  talkative_silent: 0.7,
-  foodie_ascetic: 0.1,
-  nightowl_earlybird: 0.0,
+  introversion_extroversion: 90,
+  laziness_curiosity: 40,
+  emotional_rational: -20,
+  talkative_silent: 70,
+  foodie_ascetic: 10,
+  nightowl_earlybird: 0,
 };
 
 // ---------------------------------------------------------------------------

@@ -8,31 +8,10 @@ import type {
   ChatMessage,
   TurnEvent,
   ActionSpec,
+  PersonalityDNA,
 } from '@lobster-engine/core';
 
-// ---------------------------------------------------------------------------
-// Personality DNA
-// ---------------------------------------------------------------------------
-
-/**
- * Six-axis personality descriptor where each axis is a continuous value in
- * [0, 1].  0 = the left-hand trait; 1 = the right-hand trait.
- *
- *  introversion_extroversion : 0 = deep introvert, 1 = strong extrovert
- *  laziness_curiosity        : 0 = pure laziness, 1 = insatiable curiosity
- *  emotional_rational        : 0 = fully emotional, 1 = fully rational
- *  talkative_silent          : 0 = never stops talking, 1 = rarely speaks
- *  foodie_ascetic            : 0 = obsessed with food, 1 = ascetic
- *  nightowl_earlybird        : 0 = hardcore night owl, 1 = early bird
- */
-export interface PersonalityDNA {
-  readonly introversion_extroversion: number;
-  readonly laziness_curiosity: number;
-  readonly emotional_rational: number;
-  readonly talkative_silent: number;
-  readonly foodie_ascetic: number;
-  readonly nightowl_earlybird: number;
-}
+export type { PersonalityDNA } from '@lobster-engine/core';
 
 // ---------------------------------------------------------------------------
 // Relation level
@@ -78,13 +57,13 @@ export interface ConversationLimits {
 // Helpers — personality trait accessors
 // ---------------------------------------------------------------------------
 
-/** Returns true when a trait value is in the dominant half of the spectrum. */
-function dominant(value: number, threshold = 0.6): boolean {
+/** Returns true when a trait value is in the dominant half of the spectrum (-100..+100 scale). */
+function dominant(value: number, threshold = 20): boolean {
   return value >= threshold;
 }
 
-/** Returns true when the value is in the weak half of the spectrum. */
-function recessive(value: number, threshold = 0.4): boolean {
+/** Returns true when the value is in the weak half of the spectrum (-100..+100 scale). */
+function recessive(value: number, threshold = -20): boolean {
   return value <= threshold;
 }
 
@@ -618,12 +597,12 @@ export class EncounterMatcher {
  * across all axes).
  */
 const DEFAULT_PERSONALITY: PersonalityDNA = {
-  introversion_extroversion: 0.5,
-  laziness_curiosity: 0.5,
-  emotional_rational: 0.5,
-  talkative_silent: 0.5,
-  foodie_ascetic: 0.5,
-  nightowl_earlybird: 0.5,
+  introversion_extroversion: 0,
+  laziness_curiosity: 0,
+  emotional_rational: 0,
+  talkative_silent: 0,
+  foodie_ascetic: 0,
+  nightowl_earlybird: 0,
 };
 
 /**
