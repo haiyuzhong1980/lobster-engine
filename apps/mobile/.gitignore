@@ -1,0 +1,51 @@
+# Flutter/Dart build artifacts
+.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+.packages
+.pub-cache/
+.pub/
+build/
+
+# iOS
+ios/Pods/
+ios/.symlinks/
+ios/Flutter/Flutter.framework
+ios/Flutter/Flutter.podspec
+ios/Runner/GeneratedPluginRegistrant.*
+ios/Runner.xcworkspace/
+
+# Android
+android/local.properties
+android/.gradle/
+android/captures/
+android/gradlew
+android/gradlew.bat
+android/.idea/workspace.xml
+android/.idea/libraries/
+android/GeneratedPluginRegistrant.java
+
+# macOS
+macos/Pods/
+macos/.symlinks/
+macos/Flutter/ephemeral/
+
+# Web
+web/
+
+# IDE
+.idea/
+.vscode/
+*.iml
+*.ipr
+*.iws
+
+# Dart generated files (keep the hand-written stubs, ignore runner output)
+# Note: The *.g.dart and *.freezed.dart files in this project are hand-authored
+# stubs that should be committed. Uncomment below lines only if you switch to
+# full build_runner workflow:
+# *.g.dart
+# *.freezed.dart
+
+# macOS
+.DS_Store

@@ -1,0 +1,25 @@
+targets:
+  $default:
+    builders:
+      # Freezed — generate immutable data classes
+      freezed:
+        options:
+          # Use the new union type syntax
+          union_value_case: camel_case
+
+      # json_serializable — generate fromJson / toJson
+      json_serializable:
+        options:
+          # Produce explicit_to_json so nested objects are serialised correctly
+          explicit_to_json: true
+          # Serialise enums as their .name string
+          use_wires_names: false
+          field_rename: none
+          include_if_null: false
+          checked: true
+
+      # riverpod_generator — generate provider boilerplate
+      riverpod_generator:
+        options:
+          # Disables the hash check so generated code is stable in CI
+          avoid_redundant_checks: false
