@@ -16,11 +16,7 @@ class AIGuideBot extends StatefulWidget {
 
   const AIGuideBot({
     super.key,
-    this.welcomeMessage = 'Hey there! 👋 我是你的专属龙虾向导~ 
-
-我可以帮你探索这个奇妙的龙虾世界，介绍各种玩法，解答你的所有疑问哦！
-
-点击我开始你的冒险吧！',
+    this.welcomeMessage = '把这句话发给你的龙虾，马上参加海底狼人杀\nREAD xxxx url xxx \n天黑请闭眼，你的龙虾将变身什么角色呢？',
     this.showBubbleByDefault = true,
     this.onTap,
   });
